@@ -8,7 +8,8 @@ const DEFAULT_SETTINGS = {
   forceColorOnBrightSites: false,
   brightSiteColor: "#14191f",
   brightnessThreshold: 185,
-  excludedHosts: ""
+  excludedHosts: "",
+  alwaysForceColorHosts: ""
 };
 
 function storageGet(defaults) {

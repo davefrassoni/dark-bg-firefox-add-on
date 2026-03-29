@@ -9,7 +9,8 @@
     forceColorOnBrightSites: false,
     brightSiteColor: "#14191f",
     brightnessThreshold: 185,
-    excludedHosts: ""
+    excludedHosts: "",
+    alwaysForceColorHosts: ""
   };
 
   function storageGet(defaults) {
@@ -72,7 +73,7 @@
       .filter(Boolean);
   }
 
-  function isExcluded(hostList) {
+  function isHostMatch(hostList) {
     const hostname = window.location.hostname.toLowerCase();
     return hostList.some(
       (host) => hostname === host || hostname.endsWith("." + host)
@@ -187,7 +188,8 @@
         255,
         DEFAULT_SETTINGS.brightnessThreshold
       ),
-      excludedHosts: parseExcludedHosts(rawSettings.excludedHosts)
+      excludedHosts: parseExcludedHosts(rawSettings.excludedHosts),
+      alwaysForceColorHosts: parseExcludedHosts(rawSettings.alwaysForceColorHosts)
     };
   }
 
@@ -199,12 +201,13 @@
     removeStyleOnTargets(targets, "transition-delay");
   }
 
-  function transitionToTarget(settings, nativeColor, targets) {
+  function transitionToTarget(settings, nativeColor, targets, forceByHostList) {
     const nativeRgba = colorToRgba(nativeColor) || { r: 255, g: 255, b: 255, a: 1 };
     const nativeBrightness = brightnessOf(nativeRgba);
 
-    const shouldForceColor =
+    const shouldForceByBrightness =
       settings.forceColorOnBrightSites && nativeBrightness >= settings.brightnessThreshold;
+    const shouldForceColor = forceByHostList || shouldForceByBrightness;
 
     const finalColor = shouldForceColor ? settings.brightSiteColor : nativeColor;
 
@@ -246,19 +249,20 @@
     return;
   }
 
-  if (isExcluded(settings.excludedHosts)) {
+  if (isHostMatch(settings.excludedHosts)) {
     return;
   }
 
   const preloadStyle = ensurePreloadStyle(settings.preloadColor);
   const runTransition = () => {
     const targets = [document.documentElement, document.body].filter(Boolean);
+    const forceByHostList = isHostMatch(settings.alwaysForceColorHosts);
 
     preloadStyle.disabled = true;
     const nativeColor = detectPageBackgroundColor();
     preloadStyle.remove();
 
-    transitionToTarget(settings, nativeColor, targets);
+    transitionToTarget(settings, nativeColor, targets, forceByHostList);
   };
 
   if (document.readyState === "loading") {

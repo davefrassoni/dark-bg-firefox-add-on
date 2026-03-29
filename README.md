@@ -8,6 +8,7 @@ Dark Background Anti-Flash is a Firefox extension that reduces sudden bright fla
 - Injects a dark background at `document_start` to reduce white flash.
 - Smoothly transitions from the preload color to the website background color.
 - Optional bright-site override: keep bright pages on a custom dark color.
+- Optional per-site force list: always keep selected hostnames on your custom color.
 - Full customization via extension options.
 
 ## Options
@@ -19,6 +20,7 @@ Dark Background Anti-Flash is a Firefox extension that reduces sudden bright fla
 - `Replace bright site background with a custom color`
 - `Custom color for bright sites`
 - `Brightness threshold (0-255)`
+- `Always force custom color hostnames` (one per line)
 - `Excluded hostnames` (one per line)
 
 ## Local Testing In Firefox
