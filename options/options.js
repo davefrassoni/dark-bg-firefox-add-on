@@ -8,7 +8,8 @@ const DEFAULT_SETTINGS = {
   forceColorOnBrightSites: false,
   brightSiteColor: "#14191f",
   brightnessThreshold: 185,
-  excludedHosts: ""
+  excludedHosts: "",
+  alwaysForceColorHosts: ""
 };
 
 const form = document.getElementById("settings-form");
@@ -24,6 +25,7 @@ const fields = {
   brightSiteColor: document.getElementById("brightSiteColor"),
   brightSiteColorText: document.getElementById("brightSiteColorText"),
   brightnessThreshold: document.getElementById("brightnessThreshold"),
+  alwaysForceColorHosts: document.getElementById("alwaysForceColorHosts"),
   excludedHosts: document.getElementById("excludedHosts"),
   resetDefaults: document.getElementById("resetDefaults")
 };
@@ -112,6 +114,7 @@ function populateForm(settings) {
   fields.brightSiteColor.value = settings.brightSiteColor;
   fields.brightSiteColorText.value = settings.brightSiteColor;
   fields.brightnessThreshold.value = settings.brightnessThreshold;
+  fields.alwaysForceColorHosts.value = settings.alwaysForceColorHosts || "";
   fields.excludedHosts.value = settings.excludedHosts || "";
 }
 
@@ -137,6 +140,7 @@ function readForm() {
       255,
       DEFAULT_SETTINGS.brightnessThreshold
     ),
+    alwaysForceColorHosts: fields.alwaysForceColorHosts.value,
     excludedHosts: fields.excludedHosts.value
   };
 }

@@ -22,6 +22,8 @@ The extension starts each page with a dark background at `document_start`, minim
 
 For very bright websites, you can enable a bright-site override mode. With this enabled, pages above your selected brightness threshold will keep a custom fallback color instead of switching to a bright background.
 
+You can also define a per-site force list. Any hostname in this list will always use your custom fallback color, separate from brightness detection.
+
 Main controls:
 
 - Preload dark color
@@ -30,6 +32,7 @@ Main controls:
 - Bright-site override toggle
 - Custom bright-site replacement color
 - Brightness threshold
+- Always-force hostname list
 - Hostname exclusions
 
 This makes the extension suitable for night-time browsing, dim workspaces, and users sensitive to sudden light changes.
