@@ -6,7 +6,7 @@ Dark Background Anti-Flash
 
 ## Version
 
-Current version in `manifest.json`: `1.1.4`
+Current version in `manifest.json`: `1.1.5`
 
 ## Packaging (ZIP for upload)
 
@@ -17,6 +17,7 @@ From the project root, create a zip containing these files/folders:
 - `content/`
 - `newtab/`
 - `options/`
+- `icons/`
 
 Do not include `.git` folders or unrelated local files.
 
