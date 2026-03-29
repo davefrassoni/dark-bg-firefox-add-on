@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Dark Background Anti-Flash icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1118"/>
+      <stop offset="100%" stop-color="#1d3043"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="62" fill="url(#bg)" stroke="#8bd5ff" stroke-width="4"/>
+  <circle cx="57" cy="42" r="30" fill="#e4f4ff"/>
+  <circle cx="71" cy="44" r="30" fill="#102030"/>
+  <path d="M64 56 L88 66 L82 96 L64 110 L46 96 L40 66 Z" fill="#11283a" stroke="#89d4ff" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M69 68 H59 L65 80 H57 L54 96 L73 75 H64 Z" fill="#e5fbff"/>
+</svg>
