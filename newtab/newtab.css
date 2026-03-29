@@ -1,0 +1,95 @@
+:root {
+  --base-bg: #0b0d10;
+  --panel-bg: rgba(18, 26, 35, 0.76);
+  --text: #f1f4f8;
+  --muted: #a6b2bf;
+  --accent: #81d7d0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--base-bg);
+  color: var(--text);
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(129, 215, 208, 0.2), transparent 38%),
+    radial-gradient(circle at 85% 15%, rgba(79, 137, 205, 0.2), transparent 42%),
+    radial-gradient(circle at 50% 100%, rgba(120, 90, 190, 0.15), transparent 44%);
+  transform: scale(1.06);
+  animation: drift 18s ease-in-out infinite alternate;
+}
+
+.shell {
+  width: min(90vw, 640px);
+  padding: 1.4rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--panel-bg);
+  backdrop-filter: blur(6px);
+  text-align: center;
+  position: relative;
+  z-index: 2;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
+h1 {
+  margin: 0.35rem 0 0;
+  font-size: clamp(2.5rem, 8vw, 4.4rem);
+  line-height: 1;
+}
+
+.hint {
+  color: var(--muted);
+  margin: 0.65rem 0 0;
+}
+
+.actions {
+  margin-top: 1rem;
+}
+
+button {
+  font: inherit;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(20, 32, 44, 0.8);
+  color: var(--text);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.08);
+}
+
+@keyframes drift {
+  from {
+    transform: scale(1.06) translate3d(-1.2%, 0.8%, 0);
+  }
+  to {
+    transform: scale(1.12) translate3d(1.1%, -1.2%, 0);
+  }
+}

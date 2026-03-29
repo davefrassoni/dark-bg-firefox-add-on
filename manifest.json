@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Dark Background Anti-Flash",
+  "description": "Prevents bright white flashes by preloading a dark page background and smoothly transitioning to site colors.",
+  "version": "1.0.0",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/content-script.js"
+      ],
+      "css": [
+        "content/preload.css"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "chrome_url_overrides": {
+    "newtab": "newtab/newtab.html"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "dark-background-anti-flash@local",
+      "strict_min_version": "109.0"
+    }
+  }
+}

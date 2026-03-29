@@ -1,0 +1,141 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b1015;
+  --panel: #121921;
+  --panel-soft: #18212c;
+  --text: #e6edf4;
+  --muted: #9db0c4;
+  --accent: #79b6ff;
+  --border: #2a394a;
+  --success: #89d688;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: radial-gradient(circle at top, #1a2633 0%, var(--bg) 50%, #070a0d 100%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.panel {
+  width: min(860px, calc(100% - 2rem));
+  margin: 2rem auto;
+  padding: 1.25rem;
+  background: color-mix(in srgb, var(--panel) 88%, black 12%);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.7rem;
+}
+
+.subtitle {
+  margin-top: 0.4rem;
+  color: var(--muted);
+}
+
+.section {
+  margin-top: 1.3rem;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--panel-soft), transparent);
+}
+
+h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(210px, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.65rem;
+  align-items: center;
+}
+
+input[type="number"],
+input[type="text"],
+textarea,
+button {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font: inherit;
+}
+
+input[type="number"],
+input[type="text"],
+textarea {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  background: #0c141d;
+  color: var(--text);
+}
+
+input[type="color"] {
+  width: 44px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #0c141d;
+}
+
+.color-pair {
+  display: flex;
+  gap: 0.5rem;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.actions {
+  margin-top: 1.3rem;
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+button {
+  padding: 0.55rem 0.9rem;
+  background: #121c27;
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.08);
+}
+
+button.primary {
+  border-color: color-mix(in srgb, var(--accent), var(--border));
+  background: linear-gradient(180deg, #244b74, #1b3a5a);
+}
+
+#status {
+  min-height: 1.25rem;
+  color: var(--success);
+}
+
+@media (max-width: 700px) {
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+}
