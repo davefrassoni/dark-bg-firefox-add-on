@@ -1,16 +1,26 @@
 (async () => {
   const api = typeof browser !== "undefined" ? browser : chrome;
+  const OVERLAY_ID = "dark-background-anti-flash-overlay";
+  const currentUrl = window.location.href;
+  const isAboutPage = window.location.protocol === "about:";
+  const isAboutBlank =
+    currentUrl === "about:blank" || currentUrl.startsWith("about:blank?");
+
+  // Respect Firefox native new-tab/favorites surfaces and only allow true blank about pages.
+  if (isAboutPage && !isAboutBlank) {
+    return;
+  }
 
   const DEFAULT_SETTINGS = {
     applyOnAllPages: true,
     preloadColor: "#0b0d10",
-    transitionDurationMs: 900,
-    initialHoldMs: 120,
-    forceColorOnBrightSites: false,
-    brightSiteColor: "#14191f",
+    transitionDurationMs: 1800,
+    initialHoldMs: 220,
+    tabSwitchTransitionEnabled: true,
+    tabSwitchTransitionDurationMs: 1800,
+    tabSwitchInitialHoldMs: 220,
     brightnessThreshold: 185,
-    excludedHosts: "",
-    alwaysForceColorHosts: ""
+    excludedHosts: ""
   };
 
   function storageGet(defaults) {
@@ -133,40 +143,68 @@
     return "rgb(255, 255, 255)";
   }
 
-  function setStyleOnTargets(targets, property, value, important = false) {
-    for (const target of targets) {
-      if (!target) {
-        continue;
-      }
-      if (important) {
-        target.style.setProperty(property, value, "important");
-      } else {
-        target.style.setProperty(property, value);
-      }
+  function ensureTransitionOverlay(color) {
+    const root = document.documentElement;
+    if (!root) {
+      return null;
     }
-  }
 
-  function removeStyleOnTargets(targets, property) {
-    for (const target of targets) {
-      if (!target) {
-        continue;
-      }
-      target.style.removeProperty(property);
-    }
-  }
-
-  function ensurePreloadStyle(preloadColor) {
-    const style = document.createElement("style");
-    style.id = "dark-background-anti-flash-preload-style";
-    style.textContent = `html, body { background-color: ${preloadColor} !important; }`;
-
-    if (document.head) {
-      document.head.appendChild(style);
+    let overlay = document.getElementById(OVERLAY_ID);
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = OVERLAY_ID;
+      overlay.style.position = "fixed";
+      overlay.style.inset = "0";
+      overlay.style.pointerEvents = "none";
+      overlay.style.zIndex = "2147483647";
+      overlay.style.opacity = "1";
+      overlay.style.backgroundColor = color;
+      overlay.style.transitionProperty = "opacity";
+      overlay.style.transitionTimingFunction = "ease-out";
+      root.appendChild(overlay);
     } else {
-      document.documentElement.appendChild(style);
+      overlay.style.opacity = "1";
+      overlay.style.backgroundColor = color;
     }
 
-    return style;
+    return overlay;
+  }
+
+  function removeTransitionOverlay() {
+    const existing = document.getElementById(OVERLAY_ID);
+    if (existing && existing.parentNode) {
+      existing.parentNode.removeChild(existing);
+    }
+  }
+
+  function getCleanupDelay(transitionDurationMs, initialHoldMs) {
+    return transitionDurationMs + initialHoldMs + 120;
+  }
+
+  function setOverlayVisibleImmediately(overlay, color) {
+    if (!overlay) {
+      return;
+    }
+
+    overlay.style.backgroundColor = color;
+    overlay.style.transitionDuration = "0ms";
+    overlay.style.transitionDelay = "0ms";
+    overlay.style.opacity = "1";
+    void overlay.offsetHeight;
+  }
+
+  function fadeOverlayOut(overlay, transitionDurationMs, initialHoldMs) {
+    if (!overlay) {
+      return;
+    }
+
+    overlay.style.transitionDuration = `${transitionDurationMs}ms`;
+    overlay.style.transitionDelay = `${initialHoldMs}ms`;
+    void overlay.offsetHeight;
+
+    requestAnimationFrame(() => {
+      overlay.style.opacity = "0";
+    });
   }
 
   function parseAndValidateSettings(rawSettings) {
@@ -180,64 +218,121 @@
         DEFAULT_SETTINGS.transitionDurationMs
       ),
       initialHoldMs: clamp(rawSettings.initialHoldMs, 0, 5000, DEFAULT_SETTINGS.initialHoldMs),
-      forceColorOnBrightSites: Boolean(rawSettings.forceColorOnBrightSites),
-      brightSiteColor: normalizeHexColor(rawSettings.brightSiteColor, DEFAULT_SETTINGS.brightSiteColor),
+      tabSwitchTransitionEnabled: Boolean(rawSettings.tabSwitchTransitionEnabled),
+      tabSwitchTransitionDurationMs: clamp(
+        rawSettings.tabSwitchTransitionDurationMs,
+        0,
+        10000,
+        DEFAULT_SETTINGS.tabSwitchTransitionDurationMs
+      ),
+      tabSwitchInitialHoldMs: clamp(
+        rawSettings.tabSwitchInitialHoldMs,
+        0,
+        5000,
+        DEFAULT_SETTINGS.tabSwitchInitialHoldMs
+      ),
       brightnessThreshold: clamp(
         rawSettings.brightnessThreshold,
         0,
         255,
         DEFAULT_SETTINGS.brightnessThreshold
       ),
-      excludedHosts: parseExcludedHosts(rawSettings.excludedHosts),
-      alwaysForceColorHosts: parseExcludedHosts(rawSettings.alwaysForceColorHosts)
+      excludedHosts: parseExcludedHosts(rawSettings.excludedHosts)
     };
   }
 
-  function cleanupAfterTransition(targets) {
-    removeStyleOnTargets(targets, "background-color");
-    removeStyleOnTargets(targets, "transition");
-    removeStyleOnTargets(targets, "transition-property");
-    removeStyleOnTargets(targets, "transition-duration");
-    removeStyleOnTargets(targets, "transition-delay");
+  function cleanupAfterTransition(overlay) {
+    if (overlay && overlay.parentNode && overlay.style.opacity !== "1") {
+      overlay.parentNode.removeChild(overlay);
+    }
   }
 
-  function transitionToTarget(settings, nativeColor, targets, forceByHostList) {
+  function isBrightPage(settings) {
+    const nativeColor = detectPageBackgroundColor();
     const nativeRgba = colorToRgba(nativeColor) || { r: 255, g: 255, b: 255, a: 1 };
-    const nativeBrightness = brightnessOf(nativeRgba);
+    return brightnessOf(nativeRgba) >= settings.brightnessThreshold;
+  }
 
-    const shouldForceByBrightness =
-      settings.forceColorOnBrightSites && nativeBrightness >= settings.brightnessThreshold;
-    const shouldForceColor = forceByHostList || shouldForceByBrightness;
+  function playOverlayTransition(preloadColor, transitionDurationMs, initialHoldMs) {
+    const overlay = ensureTransitionOverlay(preloadColor);
+    if (!overlay) {
+      return;
+    }
 
-    const finalColor = shouldForceColor ? settings.brightSiteColor : nativeColor;
+    setOverlayVisibleImmediately(overlay, preloadColor);
+    fadeOverlayOut(overlay, transitionDurationMs, initialHoldMs);
 
-    setStyleOnTargets(targets, "transition-property", "background-color", true);
-    setStyleOnTargets(
-      targets,
-      "transition-duration",
-      `${settings.transitionDurationMs}ms`,
-      true
+    setTimeout(() => {
+      cleanupAfterTransition(overlay);
+    }, getCleanupDelay(transitionDurationMs, initialHoldMs));
+  }
+
+  function transitionOnPageLoad(settings) {
+    if (!isBrightPage(settings)) {
+      removeTransitionOverlay();
+      return;
+    }
+
+    playOverlayTransition(
+      settings.preloadColor,
+      settings.transitionDurationMs,
+      settings.initialHoldMs
     );
-    setStyleOnTargets(targets, "transition-delay", `${settings.initialHoldMs}ms`, true);
-    setStyleOnTargets(targets, "background-color", settings.preloadColor, true);
+  }
 
-    void document.documentElement.offsetHeight;
+  function setupTabSwitchTransition(settings) {
+    if (!settings.tabSwitchTransitionEnabled) {
+      return;
+    }
 
-    requestAnimationFrame(() => {
-      const forceImportant = shouldForceColor;
-      setStyleOnTargets(targets, "background-color", finalColor, forceImportant);
+    let transitionToken = 0;
 
-      if (!shouldForceColor) {
-        const cleanupDelay = settings.transitionDurationMs + settings.initialHoldMs + 120;
-        setTimeout(() => cleanupAfterTransition(targets), cleanupDelay);
-      } else {
-        const cleanupDelay = settings.transitionDurationMs + settings.initialHoldMs + 120;
-        setTimeout(() => {
-          removeStyleOnTargets(targets, "transition");
-          removeStyleOnTargets(targets, "transition-property");
-          removeStyleOnTargets(targets, "transition-duration");
-          removeStyleOnTargets(targets, "transition-delay");
-        }, cleanupDelay);
+    const onHidden = () => {
+      transitionToken += 1;
+      if (!isBrightPage(settings)) {
+        removeTransitionOverlay();
+        return;
+      }
+
+      const overlay = ensureTransitionOverlay(settings.preloadColor);
+      setOverlayVisibleImmediately(overlay, settings.preloadColor);
+    };
+
+    const onVisible = () => {
+      const token = ++transitionToken;
+      if (!isBrightPage(settings)) {
+        removeTransitionOverlay();
+        return;
+      }
+
+      const overlay = ensureTransitionOverlay(settings.preloadColor);
+      if (!overlay) {
+        return;
+      }
+
+      setOverlayVisibleImmediately(overlay, settings.preloadColor);
+      fadeOverlayOut(
+        overlay,
+        settings.tabSwitchTransitionDurationMs,
+        settings.tabSwitchInitialHoldMs
+      );
+
+      setTimeout(() => {
+        if (token !== transitionToken) {
+          return;
+        }
+        if (document.visibilityState !== "visible") {
+          return;
+        }
+        cleanupAfterTransition(overlay);
+      }, getCleanupDelay(settings.tabSwitchTransitionDurationMs, settings.tabSwitchInitialHoldMs));
+    };
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        onHidden();
+      } else if (document.visibilityState === "visible") {
+        onVisible();
       }
     });
   }
@@ -246,28 +341,22 @@
   const settings = parseAndValidateSettings({ ...DEFAULT_SETTINGS, ...stored });
 
   if (!settings.applyOnAllPages) {
+    removeTransitionOverlay();
     return;
   }
 
   if (isHostMatch(settings.excludedHosts)) {
+    removeTransitionOverlay();
     return;
   }
 
-  const preloadStyle = ensurePreloadStyle(settings.preloadColor);
-  const runTransition = () => {
-    const targets = [document.documentElement, document.body].filter(Boolean);
-    const forceByHostList = isHostMatch(settings.alwaysForceColorHosts);
-
-    preloadStyle.disabled = true;
-    const nativeColor = detectPageBackgroundColor();
-    preloadStyle.remove();
-
-    transitionToTarget(settings, nativeColor, targets, forceByHostList);
-  };
+  setupTabSwitchTransition(settings);
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", runTransition, { once: true });
+    document.addEventListener("DOMContentLoaded", () => transitionOnPageLoad(settings), {
+      once: true
+    });
   } else {
-    runTransition();
+    transitionOnPageLoad(settings);
   }
 })();

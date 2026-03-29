@@ -4,23 +4,21 @@ Dark Background Anti-Flash is a Firefox extension that reduces sudden bright fla
 
 ## Features
 
-- Replaces the Firefox new-tab page with a dark start screen.
-- Injects a dark background at `document_start` to reduce white flash.
-- Smoothly transitions from the preload color to the website background color.
-- Optional bright-site override: keep bright pages on a custom dark color.
-- Optional per-site force list: always keep selected hostnames on your custom color.
+- Uses a dark fullscreen overlay to reduce white flash on bright pages.
+- Smoothly fades the overlay out to reveal the original page colors.
+- Does not override Firefox's built-in new-tab page/favorites.
 - Full customization via extension options.
 
 ## Options
 
 - `Apply on all websites`
 - `Preload dark color`
-- `Transition duration (ms)`
-- `Delay before transition (ms)`
-- `Replace bright site background with a custom color`
-- `Custom color for bright sites`
+- `Page load transition duration (ms)`
+- `Page load delay before transition (ms)`
+- `Enable tab switch transition`
+- `Tab switch transition duration (ms)`
+- `Tab switch delay before transition (ms)`
 - `Brightness threshold (0-255)`
-- `Always force custom color hostnames` (one per line)
 - `Excluded hostnames` (one per line)
 
 ## Local Testing In Firefox
@@ -33,7 +31,5 @@ Dark Background Anti-Flash is a Firefox extension that reduces sudden bright fla
 
 - `manifest.json` - extension manifest (MV3).
 - `background.js` - default settings initialization.
-- `content/content-script.js` - anti-flash behavior and transition logic.
-- `content/preload.css` - immediate dark preload background.
-- `newtab/*` - custom dark new-tab UI.
+- `content/content-script.js` - brightness detection and overlay transition logic.
 - `options/*` - settings UI and storage logic.

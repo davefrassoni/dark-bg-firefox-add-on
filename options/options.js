@@ -3,13 +3,13 @@ const api = typeof browser !== "undefined" ? browser : chrome;
 const DEFAULT_SETTINGS = {
   applyOnAllPages: true,
   preloadColor: "#0b0d10",
-  transitionDurationMs: 900,
-  initialHoldMs: 120,
-  forceColorOnBrightSites: false,
-  brightSiteColor: "#14191f",
+  transitionDurationMs: 1800,
+  initialHoldMs: 220,
+  tabSwitchTransitionEnabled: true,
+  tabSwitchTransitionDurationMs: 1800,
+  tabSwitchInitialHoldMs: 220,
   brightnessThreshold: 185,
-  excludedHosts: "",
-  alwaysForceColorHosts: ""
+  excludedHosts: ""
 };
 
 const form = document.getElementById("settings-form");
@@ -21,11 +21,10 @@ const fields = {
   preloadColorText: document.getElementById("preloadColorText"),
   transitionDurationMs: document.getElementById("transitionDurationMs"),
   initialHoldMs: document.getElementById("initialHoldMs"),
-  forceColorOnBrightSites: document.getElementById("forceColorOnBrightSites"),
-  brightSiteColor: document.getElementById("brightSiteColor"),
-  brightSiteColorText: document.getElementById("brightSiteColorText"),
+  tabSwitchTransitionEnabled: document.getElementById("tabSwitchTransitionEnabled"),
+  tabSwitchTransitionDurationMs: document.getElementById("tabSwitchTransitionDurationMs"),
+  tabSwitchInitialHoldMs: document.getElementById("tabSwitchInitialHoldMs"),
   brightnessThreshold: document.getElementById("brightnessThreshold"),
-  alwaysForceColorHosts: document.getElementById("alwaysForceColorHosts"),
   excludedHosts: document.getElementById("excludedHosts"),
   resetDefaults: document.getElementById("resetDefaults")
 };
@@ -110,11 +109,10 @@ function populateForm(settings) {
   fields.preloadColorText.value = settings.preloadColor;
   fields.transitionDurationMs.value = settings.transitionDurationMs;
   fields.initialHoldMs.value = settings.initialHoldMs;
-  fields.forceColorOnBrightSites.checked = settings.forceColorOnBrightSites;
-  fields.brightSiteColor.value = settings.brightSiteColor;
-  fields.brightSiteColorText.value = settings.brightSiteColor;
+  fields.tabSwitchTransitionEnabled.checked = settings.tabSwitchTransitionEnabled;
+  fields.tabSwitchTransitionDurationMs.value = settings.tabSwitchTransitionDurationMs;
+  fields.tabSwitchInitialHoldMs.value = settings.tabSwitchInitialHoldMs;
   fields.brightnessThreshold.value = settings.brightnessThreshold;
-  fields.alwaysForceColorHosts.value = settings.alwaysForceColorHosts || "";
   fields.excludedHosts.value = settings.excludedHosts || "";
 }
 
@@ -129,10 +127,18 @@ function readForm() {
       DEFAULT_SETTINGS.transitionDurationMs
     ),
     initialHoldMs: clamp(fields.initialHoldMs.value, 0, 5000, DEFAULT_SETTINGS.initialHoldMs),
-    forceColorOnBrightSites: fields.forceColorOnBrightSites.checked,
-    brightSiteColor: normalizeHexColor(
-      fields.brightSiteColorText.value,
-      DEFAULT_SETTINGS.brightSiteColor
+    tabSwitchTransitionEnabled: fields.tabSwitchTransitionEnabled.checked,
+    tabSwitchTransitionDurationMs: clamp(
+      fields.tabSwitchTransitionDurationMs.value,
+      0,
+      10000,
+      DEFAULT_SETTINGS.tabSwitchTransitionDurationMs
+    ),
+    tabSwitchInitialHoldMs: clamp(
+      fields.tabSwitchInitialHoldMs.value,
+      0,
+      5000,
+      DEFAULT_SETTINGS.tabSwitchInitialHoldMs
     ),
     brightnessThreshold: clamp(
       fields.brightnessThreshold.value,
@@ -140,7 +146,6 @@ function readForm() {
       255,
       DEFAULT_SETTINGS.brightnessThreshold
     ),
-    alwaysForceColorHosts: fields.alwaysForceColorHosts.value,
     excludedHosts: fields.excludedHosts.value
   };
 }
@@ -169,7 +174,6 @@ fields.resetDefaults.addEventListener("click", async () => {
 });
 
 syncColorInputs(fields.preloadColor, fields.preloadColorText);
-syncColorInputs(fields.brightSiteColor, fields.brightSiteColorText);
 
 (async () => {
   const stored = await storageGet(DEFAULT_SETTINGS);
