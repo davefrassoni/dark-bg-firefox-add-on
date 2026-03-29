@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Dark Background Anti-Flash",
   "description": "Prevents bright white flashes by preloading a dark page background and smoothly transitioning to site colors.",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "permissions": [
     "storage"
   ],
@@ -40,6 +40,11 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "dark-background-anti-flash@local",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      },
       "strict_min_version": "109.0"
     }
   }
