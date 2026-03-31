@@ -10,15 +10,13 @@ Current version in `manifest.json`: `1.1.7`
 
 ## Packaging (ZIP for upload)
 
-From the project root, create a zip containing these files/folders:
+From the project root, run:
 
-- `manifest.json`
-- `background.js`
-- `content/`
-- `options/`
-- `icons/`
+```powershell
+.\package.ps1
+```
 
-Do not include `.git` folders or unrelated local files.
+This creates versioned archives in `dist/` with normalized `/` zip entry paths for Firefox/AMO validation.
 
 ## Quick Pre-Publish Checklist
 
