@@ -267,6 +267,12 @@
     }, getCleanupDelay(transitionDurationMs, initialHoldMs));
   }
 
+  function showInitialOverlay(color) {
+    const overlay = ensureTransitionOverlay(color);
+    setOverlayVisibleImmediately(overlay, color);
+    return overlay;
+  }
+
   function transitionOnPageLoad(settings) {
     if (!isBrightPage(settings)) {
       removeTransitionOverlay();
@@ -337,6 +343,10 @@
     });
   }
 
+  // Keep a protective overlay visible immediately on first navigation while
+  // settings load and before we can inspect the page background.
+  const initialOverlay = showInitialOverlay(DEFAULT_SETTINGS.preloadColor);
+
   const stored = await storageGet(DEFAULT_SETTINGS);
   const settings = parseAndValidateSettings({ ...DEFAULT_SETTINGS, ...stored });
 
@@ -348,6 +358,10 @@
   if (isHostMatch(settings.excludedHosts)) {
     removeTransitionOverlay();
     return;
+  }
+
+  if (initialOverlay) {
+    initialOverlay.style.backgroundColor = settings.preloadColor;
   }
 
   setupTabSwitchTransition(settings);
