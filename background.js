@@ -46,22 +46,31 @@ function storageSet(value) {
   });
 }
 
+function shouldReplaceLegacyValue(existingValue, legacyValue) {
+  return existingValue === undefined || Number(existingValue) === legacyValue;
+}
+
 api.runtime.onInstalled.addListener(async () => {
   const existing = await storageGet({});
   const merged = { ...DEFAULT_SETTINGS, ...existing };
 
-  const hasLegacyOrUnsetDuration =
-    existing.transitionDurationMs === undefined ||
-    Number(existing.transitionDurationMs) === LEGACY_TRANSITION_DEFAULTS.transitionDurationMs;
-  const hasLegacyOrUnsetHold =
-    existing.initialHoldMs === undefined ||
-    Number(existing.initialHoldMs) === LEGACY_TRANSITION_DEFAULTS.initialHoldMs;
-
-  if (hasLegacyOrUnsetDuration) {
+  // Older installs used a shorter fade. Keep intentional user changes, but
+  // move unset or untouched installs to the softer defaults.
+  if (
+    shouldReplaceLegacyValue(
+      existing.transitionDurationMs,
+      LEGACY_TRANSITION_DEFAULTS.transitionDurationMs
+    )
+  ) {
     merged.transitionDurationMs = DEFAULT_SETTINGS.transitionDurationMs;
   }
 
-  if (hasLegacyOrUnsetHold) {
+  if (
+    shouldReplaceLegacyValue(
+      existing.initialHoldMs,
+      LEGACY_TRANSITION_DEFAULTS.initialHoldMs
+    )
+  ) {
     merged.initialHoldMs = DEFAULT_SETTINGS.initialHoldMs;
   }
 

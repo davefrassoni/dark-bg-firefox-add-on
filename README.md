@@ -1,35 +1,48 @@
-# Dark Background Anti-Flash (Firefox)
+# Dark Background Anti-Flash
 
-Dark Background Anti-Flash is a Firefox extension that reduces sudden bright flashes while browsing in low-light environments.
+A small Firefox extension that reduces the sudden white flash that can appear while bright pages load or when returning to a bright tab.
 
-## Features
+[Install it from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/dark-background-anti-flash/).
 
-- Uses a dark fullscreen overlay to reduce white flash on bright pages.
-- Smoothly fades the overlay out to reveal the original page colors.
-- Does not override Firefox's built-in new-tab page/favorites.
-- Full customization via extension options.
+## What It Does
 
-## Options
+- Shows a temporary dark overlay before a bright page is ready.
+- Fades the overlay away smoothly instead of snapping to white.
+- Can repeat the same protection when you return to an existing tab.
+- Leaves Firefox's built-in New Tab page and favorites alone.
+- Stores settings with Firefox sync storage and does not collect data.
 
-- `Apply on all websites`
-- `Preload dark color`
-- `Page load transition duration (ms)`
-- `Page load delay before transition (ms)`
-- `Enable tab switch transition`
-- `Tab switch transition duration (ms)`
-- `Tab switch delay before transition (ms)`
-- `Brightness threshold (0-255)`
-- `Excluded hostnames` (one per line)
+## Settings
 
-## Local Testing In Firefox
+- `Apply on all websites`: master switch for the page overlay.
+- `Preload dark color`: color used while the page is guarded.
+- `Transition duration`: fade-out speed for page loads.
+- `Delay before transition`: how long to hold the dark overlay before fading.
+- `Tab switch transition`: optional fade when returning to an existing tab.
+- `Brightness threshold`: only pages at or above this brightness get the overlay.
+- `Excluded hostnames`: one hostname per line for sites that should be skipped.
 
-1. Open `about:debugging#/runtime/this-firefox`.
+## Local Testing
+
+1. Open `about:debugging#/runtime/this-firefox` in Firefox.
 2. Click **Load Temporary Add-on**.
 3. Select [manifest.json](./manifest.json).
+4. Open a bright page and confirm the dark overlay fades out cleanly.
+5. Open the extension options page and confirm settings save and apply after reload.
+
+## Packaging
+
+Run the packager from the repository root:
+
+```powershell
+.\package.ps1
+```
+
+Versioned archives are written to `dist/`.
 
 ## Project Structure
 
-- `manifest.json` - extension manifest (MV3).
-- `background.js` - default settings initialization.
-- `content/content-script.js` - brightness detection and overlay transition logic.
-- `options/*` - settings UI and storage logic.
+- [manifest.json](./manifest.json): Firefox MV3 manifest.
+- [background.js](./background.js): installs and migrates default settings.
+- [content/content-script.js](./content/content-script.js): detects bright pages and runs overlay transitions.
+- [options](./options): settings page UI, styles, and storage logic.
