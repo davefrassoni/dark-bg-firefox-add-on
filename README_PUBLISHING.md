@@ -1,5 +1,7 @@
 # Publishing Notes
 
+Live listing: https://addons.mozilla.org/en-US/firefox/addon/dark-background-anti-flash/
+
 ## Extension Name
 
 Dark Background Anti-Flash

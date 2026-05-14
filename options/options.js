@@ -96,6 +96,7 @@ function syncColorInputs(colorInput, textInput) {
   });
 
   textInput.addEventListener("input", () => {
+    // Keep the color picker usable even while the text field is being edited.
     const normalized = normalizeHexColor(textInput.value, colorInput.value);
     if (normalized !== colorInput.value) {
       colorInput.value = normalized;
@@ -119,14 +120,22 @@ function populateForm(settings) {
 function readForm() {
   return {
     applyOnAllPages: fields.applyOnAllPages.checked,
-    preloadColor: normalizeHexColor(fields.preloadColorText.value, DEFAULT_SETTINGS.preloadColor),
+    preloadColor: normalizeHexColor(
+      fields.preloadColorText.value,
+      DEFAULT_SETTINGS.preloadColor
+    ),
     transitionDurationMs: clamp(
       fields.transitionDurationMs.value,
       0,
       10000,
       DEFAULT_SETTINGS.transitionDurationMs
     ),
-    initialHoldMs: clamp(fields.initialHoldMs.value, 0, 5000, DEFAULT_SETTINGS.initialHoldMs),
+    initialHoldMs: clamp(
+      fields.initialHoldMs.value,
+      0,
+      5000,
+      DEFAULT_SETTINGS.initialHoldMs
+    ),
     tabSwitchTransitionEnabled: fields.tabSwitchTransitionEnabled.checked,
     tabSwitchTransitionDurationMs: clamp(
       fields.tabSwitchTransitionDurationMs.value,

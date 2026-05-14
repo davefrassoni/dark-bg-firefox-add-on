@@ -23,6 +23,8 @@
     excludedHosts: ""
   };
 
+  const CLEANUP_BUFFER_MS = 120;
+
   function storageGet(defaults) {
     try {
       const result = api.storage.sync.get(defaults);
@@ -83,7 +85,7 @@
       .filter(Boolean);
   }
 
-  function isHostMatch(hostList) {
+  function isCurrentHostIn(hostList) {
     const hostname = window.location.hostname.toLowerCase();
     return hostList.some(
       (host) => hostname === host || hostname.endsWith("." + host)
@@ -106,6 +108,7 @@
   }
 
   function colorToRgba(colorValue) {
+    // Let the browser normalize named colors, hex values, and CSS color syntax.
     const probe = document.createElement("span");
     probe.style.color = colorValue;
     probe.style.display = "none";
@@ -178,7 +181,7 @@
   }
 
   function getCleanupDelay(transitionDurationMs, initialHoldMs) {
-    return transitionDurationMs + initialHoldMs + 120;
+    return transitionDurationMs + initialHoldMs + CLEANUP_BUFFER_MS;
   }
 
   function setOverlayVisibleImmediately(overlay, color) {
@@ -190,6 +193,9 @@
     overlay.style.transitionDuration = "0ms";
     overlay.style.transitionDelay = "0ms";
     overlay.style.opacity = "1";
+
+    // Force style calculation before enabling the fade so repeated tab
+    // switches do not reuse the previous transition state.
     void overlay.offsetHeight;
   }
 
@@ -210,14 +216,22 @@
   function parseAndValidateSettings(rawSettings) {
     return {
       applyOnAllPages: Boolean(rawSettings.applyOnAllPages),
-      preloadColor: normalizeHexColor(rawSettings.preloadColor, DEFAULT_SETTINGS.preloadColor),
+      preloadColor: normalizeHexColor(
+        rawSettings.preloadColor,
+        DEFAULT_SETTINGS.preloadColor
+      ),
       transitionDurationMs: clamp(
         rawSettings.transitionDurationMs,
         0,
         10000,
         DEFAULT_SETTINGS.transitionDurationMs
       ),
-      initialHoldMs: clamp(rawSettings.initialHoldMs, 0, 5000, DEFAULT_SETTINGS.initialHoldMs),
+      initialHoldMs: clamp(
+        rawSettings.initialHoldMs,
+        0,
+        5000,
+        DEFAULT_SETTINGS.initialHoldMs
+      ),
       tabSwitchTransitionEnabled: Boolean(rawSettings.tabSwitchTransitionEnabled),
       tabSwitchTransitionDurationMs: clamp(
         rawSettings.tabSwitchTransitionDurationMs,
@@ -331,7 +345,10 @@
           return;
         }
         cleanupAfterTransition(overlay);
-      }, getCleanupDelay(settings.tabSwitchTransitionDurationMs, settings.tabSwitchInitialHoldMs));
+      }, getCleanupDelay(
+        settings.tabSwitchTransitionDurationMs,
+        settings.tabSwitchInitialHoldMs
+      ));
     };
 
     document.addEventListener("visibilitychange", () => {
@@ -355,7 +372,7 @@
     return;
   }
 
-  if (isHostMatch(settings.excludedHosts)) {
+  if (isCurrentHostIn(settings.excludedHosts)) {
     removeTransitionOverlay();
     return;
   }
