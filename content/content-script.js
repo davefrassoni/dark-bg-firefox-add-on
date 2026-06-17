@@ -20,6 +20,8 @@
     tabSwitchTransitionDurationMs: 1800,
     tabSwitchInitialHoldMs: 220,
     brightnessThreshold: 185,
+    siteListMode: "blacklist",
+    siteListHosts: "",
     excludedHosts: ""
   };
 
@@ -71,7 +73,7 @@
     return normalized;
   }
 
-  function parseExcludedHosts(raw) {
+  function parseSiteRules(raw) {
     if (typeof raw !== "string" || raw.trim() === "") {
       return [];
     }
@@ -80,16 +82,62 @@
       .split(/\r?\n/g)
       .map((entry) => entry.trim().toLowerCase())
       .filter(Boolean)
-      .map((entry) => entry.replace(/^https?:\/\//, ""))
-      .map((entry) => entry.split("/")[0])
-      .filter(Boolean);
+      .map((entry) => {
+        const withScheme = /^[a-z][a-z0-9+.-]*:\/\//.test(entry)
+          ? entry
+          : `https://${entry}`;
+
+        try {
+          const parsed = new URL(withScheme);
+          const entryHasPath = entry.replace(/^[a-z][a-z0-9+.-]*:\/\//, "").includes("/");
+          const pathPrefix =
+            entryHasPath && parsed.pathname !== "/"
+              ? parsed.pathname.replace(/\/+$/, "")
+              : "";
+
+          return {
+            hostname: parsed.hostname.replace(/^\*\./, ""),
+            pathPrefix
+          };
+        } catch (error) {
+          return null;
+        }
+      })
+      .filter((rule) => rule && rule.hostname);
   }
 
-  function isCurrentHostIn(hostList) {
+  function isHostnameMatch(hostname, ruleHostname) {
+    return hostname === ruleHostname || hostname.endsWith("." + ruleHostname);
+  }
+
+  function isPathMatch(pathname, pathPrefix) {
+    if (!pathPrefix) {
+      return true;
+    }
+    return pathname === pathPrefix || pathname.startsWith(pathPrefix + "/");
+  }
+
+  function isCurrentPageIn(siteRules) {
     const hostname = window.location.hostname.toLowerCase();
-    return hostList.some(
-      (host) => hostname === host || hostname.endsWith("." + host)
+    const pathname = window.location.pathname || "/";
+
+    return siteRules.some(
+      (rule) =>
+        isHostnameMatch(hostname, rule.hostname) &&
+        isPathMatch(pathname, rule.pathPrefix)
     );
+  }
+
+  function normalizeSiteListMode(value) {
+    return value === "whitelist" ? "whitelist" : "blacklist";
+  }
+
+  function shouldRunOnCurrentPage(settings) {
+    const isListed = isCurrentPageIn(settings.siteListRules);
+    if (settings.siteListMode === "whitelist") {
+      return isListed;
+    }
+    return !isListed;
   }
 
   function parseRgbString(rgbValue) {
@@ -214,6 +262,11 @@
   }
 
   function parseAndValidateSettings(rawSettings) {
+    const siteListHosts =
+      rawSettings.siteListHosts === undefined
+        ? rawSettings.excludedHosts
+        : rawSettings.siteListHosts;
+
     return {
       applyOnAllPages: Boolean(rawSettings.applyOnAllPages),
       preloadColor: normalizeHexColor(
@@ -251,7 +304,8 @@
         255,
         DEFAULT_SETTINGS.brightnessThreshold
       ),
-      excludedHosts: parseExcludedHosts(rawSettings.excludedHosts)
+      siteListMode: normalizeSiteListMode(rawSettings.siteListMode),
+      siteListRules: parseSiteRules(siteListHosts)
     };
   }
 
@@ -360,26 +414,25 @@
     });
   }
 
-  // Keep a protective overlay visible immediately on first navigation while
-  // settings load and before we can inspect the page background.
-  const initialOverlay = showInitialOverlay(DEFAULT_SETTINGS.preloadColor);
+  const stored = await storageGet({});
+  const rawSettings = { ...DEFAULT_SETTINGS, ...stored };
+  if (stored.siteListHosts === undefined && stored.excludedHosts) {
+    rawSettings.siteListHosts = stored.excludedHosts;
+  }
 
-  const stored = await storageGet(DEFAULT_SETTINGS);
-  const settings = parseAndValidateSettings({ ...DEFAULT_SETTINGS, ...stored });
+  const settings = parseAndValidateSettings(rawSettings);
 
   if (!settings.applyOnAllPages) {
     removeTransitionOverlay();
     return;
   }
 
-  if (isCurrentHostIn(settings.excludedHosts)) {
+  if (!shouldRunOnCurrentPage(settings)) {
     removeTransitionOverlay();
     return;
   }
 
-  if (initialOverlay) {
-    initialOverlay.style.backgroundColor = settings.preloadColor;
-  }
+  showInitialOverlay(settings.preloadColor);
 
   setupTabSwitchTransition(settings);
 

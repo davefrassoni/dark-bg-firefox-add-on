@@ -14,21 +14,28 @@ A small Firefox extension that reduces the sudden white flash that can appear wh
 
 ## Settings
 
+- Click the toolbar button to open the options page.
+- Right-click the toolbar button and choose `Open options`.
+- If the button is not visible, open Firefox's Extensions button, find `Dark Background Anti-Flash`, and pin it to the toolbar.
+- `Settings page language`: use `Auto` or choose English, Spanish, Portuguese, French, German, Chinese, Japanese, Korean, Russian, or Arabic.
 - `Apply on all websites`: master switch for the page overlay.
 - `Preload dark color`: color used while the page is guarded.
 - `Transition duration`: fade-out speed for page loads.
 - `Delay before transition`: how long to hold the dark overlay before fading.
 - `Tab switch transition`: optional fade when returning to an existing tab.
 - `Brightness threshold`: only pages at or above this brightness get the overlay.
-- `Excluded hostnames`: one hostname per line for sites that should be skipped.
+- `Site Access`: use a blacklist to skip listed pages, or a whitelist to run only on listed pages.
 
 ## Local Testing
 
 1. Open `about:debugging#/runtime/this-firefox` in Firefox.
 2. Click **Load Temporary Add-on**.
 3. Select [manifest.json](./manifest.json).
-4. Open a bright page and confirm the dark overlay fades out cleanly.
-5. Open the extension options page and confirm settings save and apply after reload.
+4. Click the extension toolbar button and confirm the options page opens.
+5. Right-click the extension toolbar button and choose `Open options`.
+6. Change the settings page language and confirm labels update immediately.
+7. Open a bright page and confirm the dark overlay fades out cleanly.
+8. Change the Site Access mode, save, reload the test page, and confirm whitelist or blacklist behavior.
 
 ## Packaging
 

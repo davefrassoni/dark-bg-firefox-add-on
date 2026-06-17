@@ -9,12 +9,51 @@ const DEFAULT_SETTINGS = {
   tabSwitchTransitionDurationMs: 1800,
   tabSwitchInitialHoldMs: 220,
   brightnessThreshold: 185,
+  siteListMode: "blacklist",
+  siteListHosts: "",
+  uiLanguage: "auto",
   excludedHosts: ""
 };
 const LEGACY_TRANSITION_DEFAULTS = {
   transitionDurationMs: 900,
   initialHoldMs: 120
 };
+const OPEN_OPTIONS_MENU_ID = "open-options";
+const menuApi = api.menus || api.contextMenus;
+
+function openOptionsPage() {
+  const result = api.runtime.openOptionsPage();
+  if (result && typeof result.catch === "function") {
+    result.catch(() => {});
+  }
+}
+
+function installActionMenu() {
+  if (!menuApi) {
+    return;
+  }
+
+  const createMenu = () => {
+    menuApi.create({
+      id: OPEN_OPTIONS_MENU_ID,
+      title: "Open options",
+      contexts: ["action"]
+    });
+  };
+
+  try {
+    const result = menuApi.removeAll();
+    if (result && typeof result.then === "function") {
+      result.then(createMenu, createMenu);
+      return;
+    }
+  } catch (error) {
+    createMenu();
+    return;
+  }
+
+  createMenu();
+}
 
 function storageGet(defaults) {
   try {
@@ -86,5 +125,27 @@ api.runtime.onInstalled.addListener(async () => {
     merged.tabSwitchInitialHoldMs = DEFAULT_SETTINGS.tabSwitchInitialHoldMs;
   }
 
+  if (existing.siteListMode === undefined) {
+    merged.siteListMode = DEFAULT_SETTINGS.siteListMode;
+  }
+
+  if (existing.siteListHosts === undefined) {
+    merged.siteListHosts = existing.excludedHosts || DEFAULT_SETTINGS.siteListHosts;
+  }
+
   await storageSet(merged);
 });
+
+if (api.action && api.action.onClicked) {
+  api.action.onClicked.addListener(openOptionsPage);
+}
+
+if (menuApi && menuApi.onClicked) {
+  menuApi.onClicked.addListener((info) => {
+    if (info.menuItemId === OPEN_OPTIONS_MENU_ID) {
+      openOptionsPage();
+    }
+  });
+
+  installActionMenu();
+}
