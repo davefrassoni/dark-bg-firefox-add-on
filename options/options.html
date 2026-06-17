@@ -8,21 +8,41 @@
   </head>
   <body>
     <main class="panel">
-      <h1>Dark Background Anti-Flash</h1>
-      <p class="subtitle">
+      <h1 data-i18n="appTitle">Dark Background Anti-Flash</h1>
+      <p class="subtitle" data-i18n="subtitle">
         Configure preload color, page-load and tab-switch transitions, and bright-page detection.
       </p>
 
       <form id="settings-form">
         <section class="section">
-          <h2>Base Guard</h2>
+          <h2 data-i18n="languageHeading">Language</h2>
+          <div class="field-grid">
+            <label for="uiLanguage" data-i18n="languageLabel">Settings page language</label>
+            <select id="uiLanguage">
+              <option value="auto" data-i18n="languageAuto">Auto</option>
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="pt_BR">Português</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="zh_CN">中文</option>
+              <option value="ja">日本語</option>
+              <option value="ko">한국어</option>
+              <option value="ru">Русский</option>
+              <option value="ar">العربية</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 data-i18n="baseGuard">Base Guard</h2>
           <label class="switch">
             <input type="checkbox" id="applyOnAllPages">
-            <span>Apply on all websites</span>
+            <span data-i18n="applyOnAllPages">Apply on all websites</span>
           </label>
 
           <div class="field-grid">
-            <label for="preloadColor">Preload dark color</label>
+            <label for="preloadColor" data-i18n="preloadColor">Preload dark color</label>
             <div class="color-pair">
               <input type="color" id="preloadColor">
               <input type="text" id="preloadColorText" inputmode="text" spellcheck="false">
@@ -31,59 +51,68 @@
         </section>
 
         <section class="section">
-          <h2>Page Load Transition</h2>
+          <h2 data-i18n="pageLoadTransition">Page Load Transition</h2>
           <div class="field-grid">
-            <label for="transitionDurationMs">Transition duration (ms)</label>
+            <label for="transitionDurationMs" data-i18n="transitionDuration">Transition duration (ms)</label>
             <input type="number" id="transitionDurationMs" min="0" max="10000" step="50">
           </div>
 
           <div class="field-grid">
-            <label for="initialHoldMs">Delay before transition (ms)</label>
+            <label for="initialHoldMs" data-i18n="initialHold">Delay before transition (ms)</label>
             <input type="number" id="initialHoldMs" min="0" max="5000" step="20">
           </div>
         </section>
 
         <section class="section">
-          <h2>Tab Switch Transition</h2>
+          <h2 data-i18n="tabSwitchTransition">Tab Switch Transition</h2>
           <label class="switch">
             <input type="checkbox" id="tabSwitchTransitionEnabled">
-            <span>Apply transition when returning to a tab</span>
+            <span data-i18n="tabSwitchEnabled">Apply transition when returning to a tab</span>
           </label>
 
           <div class="field-grid">
-            <label for="tabSwitchTransitionDurationMs">Transition duration (ms)</label>
+            <label for="tabSwitchTransitionDurationMs" data-i18n="transitionDuration">Transition duration (ms)</label>
             <input type="number" id="tabSwitchTransitionDurationMs" min="0" max="10000" step="50">
           </div>
 
           <div class="field-grid">
-            <label for="tabSwitchInitialHoldMs">Delay before transition (ms)</label>
+            <label for="tabSwitchInitialHoldMs" data-i18n="initialHold">Delay before transition (ms)</label>
             <input type="number" id="tabSwitchInitialHoldMs" min="0" max="5000" step="20">
           </div>
         </section>
 
         <section class="section">
-          <h2>Bright Page Detection</h2>
+          <h2 data-i18n="brightPageDetection">Bright Page Detection</h2>
           <div class="field-grid">
-            <label for="brightnessThreshold">Brightness threshold (0-255)</label>
+            <label for="brightnessThreshold" data-i18n="brightnessThreshold">Brightness threshold (0-255)</label>
             <input type="number" id="brightnessThreshold" min="0" max="255" step="1">
           </div>
         </section>
 
         <section class="section">
-          <h2>Exclusions</h2>
-          <label for="excludedHosts">
-            Skip selected hostnames (one per line)
+          <h2 data-i18n="siteAccess">Site Access</h2>
+          <div class="field-grid">
+            <label for="siteListMode" data-i18n="listBehavior">List behavior</label>
+            <select id="siteListMode">
+              <option value="blacklist" data-i18n="blacklistOption">Disable on listed pages</option>
+              <option value="whitelist" data-i18n="whitelistOption">Only run on listed pages</option>
+            </select>
+          </div>
+
+          <label for="siteListHosts" class="textarea-label" data-i18n="siteListHosts">
+            Websites or pages (one per line)
           </label>
           <textarea
-            id="excludedHosts"
+            id="siteListHosts"
             rows="5"
-            placeholder="example.com&#10;news.example.org"
+            data-i18n-placeholder="siteListPlaceholder"
+            placeholder="example.com&#10;example.com/docs&#10;https://news.example.org/article"
           ></textarea>
         </section>
 
         <div class="actions">
-          <button type="submit" class="primary">Save Settings</button>
-          <button type="button" id="resetDefaults">Reset Defaults</button>
+          <button type="submit" class="primary" data-i18n="saveSettings">Save Settings</button>
+          <button type="button" id="resetDefaults" data-i18n="resetDefaults">Reset Defaults</button>
           <span id="status" role="status" aria-live="polite"></span>
         </div>
       </form>

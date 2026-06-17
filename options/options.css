@@ -72,6 +72,7 @@ h2 {
 
 input[type="number"],
 input[type="text"],
+select,
 textarea,
 button {
   border-radius: 8px;
@@ -81,6 +82,7 @@ button {
 
 input[type="number"],
 input[type="text"],
+select,
 textarea {
   width: 100%;
   padding: 0.5rem 0.6rem;
@@ -99,6 +101,11 @@ input[type="color"] {
 .color-pair {
   display: flex;
   gap: 0.5rem;
+}
+
+.textarea-label {
+  display: block;
+  margin: 0.85rem 0 0.45rem;
 }
 
 textarea {
