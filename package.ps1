@@ -18,7 +18,11 @@ $itemsToPackage = @(
   "background.js",
   "content",
   "options",
-  "icons"
+  "icons/icon-16.png",
+  "icons/icon-32.png",
+  "icons/icon-48.png",
+  "icons/icon-96.png",
+  "icons/icon-128.png"
 )
 $archiveNames = @(
   "dark-background-anti-flash-v$Version.zip",
