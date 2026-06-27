@@ -1,10 +1,18 @@
 (async () => {
   const api = typeof browser !== "undefined" ? browser : chrome;
   const OVERLAY_ID = "dark-background-anti-flash-overlay";
+  const SAME_ORIGIN_NAVIGATION_KEY = "dark-background-anti-flash:same-origin-navigation";
+  const SAME_ORIGIN_NAVIGATION_MAX_AGE_MS = 15000;
   const currentUrl = window.location.href;
   const isAboutPage = window.location.protocol === "about:";
   const isAboutBlank =
     currentUrl === "about:blank" || currentUrl.startsWith("about:blank?");
+
+  // A top-level overlay already covers embedded documents. Running in frames can
+  // also bypass a site-list rule that correctly matched the top-level page.
+  if (window.top !== window) {
+    return;
+  }
 
   // Respect Firefox native new-tab/favorites surfaces and only allow true blank about pages.
   if (isAboutPage && !isAboutBlank) {
@@ -20,6 +28,9 @@
     tabSwitchTransitionDurationMs: 1800,
     tabSwitchInitialHoldMs: 220,
     brightnessThreshold: 185,
+    darkenBrightBackgroundsEnabled: false,
+    darkBackgroundColor: "#121417",
+    backgroundBrightnessThreshold: 210,
     siteListMode: "blacklist",
     siteListHosts: "",
     excludedHosts: ""
@@ -80,23 +91,28 @@
 
     return raw
       .split(/\r?\n/g)
-      .map((entry) => entry.trim().toLowerCase())
+      .map((entry) => entry.trim())
       .filter(Boolean)
       .map((entry) => {
-        const withScheme = /^[a-z][a-z0-9+.-]*:\/\//.test(entry)
-          ? entry
-          : `https://${entry}`;
+        const normalizedEntry = entry
+          .replace(/^\/\//, "")
+          .replace(/\/\*$/, "");
+        const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(entry)
+          ? normalizedEntry
+          : `https://${normalizedEntry}`;
 
         try {
           const parsed = new URL(withScheme);
-          const entryHasPath = entry.replace(/^[a-z][a-z0-9+.-]*:\/\//, "").includes("/");
+          const entryHasPath = normalizedEntry
+            .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
+            .includes("/");
           const pathPrefix =
             entryHasPath && parsed.pathname !== "/"
               ? parsed.pathname.replace(/\/+$/, "")
               : "";
 
           return {
-            hostname: parsed.hostname.replace(/^\*\./, ""),
+            hostname: parsed.hostname.toLowerCase().replace(/^\*\./, ""),
             pathPrefix
           };
         } catch (error) {
@@ -138,6 +154,108 @@
       return isListed;
     }
     return !isListed;
+  }
+
+  function isEnabledOnCurrentPage(settings) {
+    return settings.applyOnAllPages && shouldRunOnCurrentPage(settings);
+  }
+
+  function normalizeComparableUrl(value) {
+    try {
+      const parsed = new URL(value, window.location.href);
+      parsed.hash = "";
+      return parsed.href;
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function consumeSameOriginNavigationMarker() {
+    try {
+      const rawMarker = sessionStorage.getItem(SAME_ORIGIN_NAVIGATION_KEY);
+      sessionStorage.removeItem(SAME_ORIGIN_NAVIGATION_KEY);
+      if (!rawMarker) {
+        return false;
+      }
+
+      const marker = JSON.parse(rawMarker);
+      const markerAge = Date.now() - Number(marker.createdAt);
+      return (
+        markerAge >= 0 &&
+        markerAge <= SAME_ORIGIN_NAVIGATION_MAX_AGE_MS &&
+        normalizeComparableUrl(marker.destination) ===
+          normalizeComparableUrl(window.location.href)
+      );
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function findClickedLink(event) {
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    for (const item of path) {
+      if (item instanceof HTMLAnchorElement && item.href) {
+        return item;
+      }
+    }
+
+    return event.target instanceof Element
+      ? event.target.closest("a[href]")
+      : null;
+  }
+
+  function setupSameOriginNavigationTracking(settings) {
+    document.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        ) {
+          return;
+        }
+
+        const link = findClickedLink(event);
+        if (
+          !link ||
+          link.hasAttribute("download") ||
+          (link.target && link.target.toLowerCase() !== "_self")
+        ) {
+          return;
+        }
+
+        let destination;
+        try {
+          destination = new URL(link.href, window.location.href);
+        } catch (error) {
+          return;
+        }
+
+        if (
+          destination.origin !== window.location.origin ||
+          destination.href === window.location.href ||
+          !isBrightPage(settings)
+        ) {
+          return;
+        }
+
+        try {
+          sessionStorage.setItem(
+            SAME_ORIGIN_NAVIGATION_KEY,
+            JSON.stringify({
+              destination: destination.href,
+              createdAt: Date.now()
+            })
+          );
+        } catch (error) {
+          // Some pages block access to session storage.
+        }
+      },
+      true
+    );
   }
 
   function parseRgbString(rgbValue) {
@@ -304,6 +422,19 @@
         255,
         DEFAULT_SETTINGS.brightnessThreshold
       ),
+      darkenBrightBackgroundsEnabled: Boolean(
+        rawSettings.darkenBrightBackgroundsEnabled
+      ),
+      darkBackgroundColor: normalizeHexColor(
+        rawSettings.darkBackgroundColor,
+        DEFAULT_SETTINGS.darkBackgroundColor
+      ),
+      backgroundBrightnessThreshold: clamp(
+        rawSettings.backgroundBrightnessThreshold,
+        0,
+        255,
+        DEFAULT_SETTINGS.backgroundBrightnessThreshold
+      ),
       siteListMode: normalizeSiteListMode(rawSettings.siteListMode),
       siteListRules: parseSiteRules(siteListHosts)
     };
@@ -319,6 +450,170 @@
     const nativeColor = detectPageBackgroundColor();
     const nativeRgba = colorToRgba(nativeColor) || { r: 255, g: 255, b: 255, a: 1 };
     return brightnessOf(nativeRgba) >= settings.brightnessThreshold;
+  }
+
+  function isBrightBackground(element, settings) {
+    if (!(element instanceof Element) || element.id === OVERLAY_ID) {
+      return false;
+    }
+
+    const color = parseRgbString(getComputedStyle(element).backgroundColor);
+    return (
+      color &&
+      color.a > 0.05 &&
+      brightnessOf(color) >= settings.backgroundBrightnessThreshold
+    );
+  }
+
+  function setDarkBackground(element, settings, originalBackgrounds) {
+    if (!originalBackgrounds.has(element)) {
+      originalBackgrounds.set(element, {
+        value: element.style.getPropertyValue("background-color"),
+        priority: element.style.getPropertyPriority("background-color")
+      });
+    }
+
+    element.style.setProperty(
+      "background-color",
+      settings.darkBackgroundColor,
+      "important"
+    );
+  }
+
+  function overrideBrightBackground(element, settings, originalBackgrounds) {
+    if (!isBrightBackground(element, settings)) {
+      return;
+    }
+
+    setDarkBackground(element, settings, originalBackgrounds);
+  }
+
+  function overrideBrightPageCanvas(settings, originalBackgrounds) {
+    const pageColor = colorToRgba(detectPageBackgroundColor());
+    if (
+      pageColor &&
+      brightnessOf(pageColor) >= settings.backgroundBrightnessThreshold
+    ) {
+      setDarkBackground(
+        document.documentElement,
+        settings,
+        originalBackgrounds
+      );
+    }
+  }
+
+  function overrideBrightBackgroundsIn(root, settings, originalBackgrounds) {
+    if (root === document) {
+      overrideBrightPageCanvas(settings, originalBackgrounds);
+    }
+
+    if (root instanceof Element) {
+      overrideBrightBackground(root, settings, originalBackgrounds);
+    }
+
+    if (root && typeof root.querySelectorAll === "function") {
+      root.querySelectorAll("*").forEach((element) => {
+        overrideBrightBackground(element, settings, originalBackgrounds);
+      });
+    }
+  }
+
+  function setupBrightBackgroundOverrides(settings) {
+    const originalBackgrounds = new Map();
+
+    overrideBrightBackgroundsIn(document, settings, originalBackgrounds);
+
+    let fullScanScheduled = false;
+    const scheduleFullScan = () => {
+      if (fullScanScheduled) {
+        return;
+      }
+      fullScanScheduled = true;
+      requestAnimationFrame(() => {
+        fullScanScheduled = false;
+        if (
+          settings.darkenBrightBackgroundsEnabled &&
+          isEnabledOnCurrentPage(settings)
+        ) {
+          overrideBrightBackgroundsIn(
+            document,
+            settings,
+            originalBackgrounds
+          );
+        }
+      });
+    };
+
+    const observer = new MutationObserver((mutations) => {
+      let stylesheetChanged = false;
+
+      for (const mutation of mutations) {
+        if (mutation.type === "attributes") {
+          overrideBrightBackground(
+            mutation.target,
+            settings,
+            originalBackgrounds
+          );
+          continue;
+        }
+
+        if (
+          mutation.target instanceof Element &&
+          mutation.target.closest("style")
+        ) {
+          stylesheetChanged = true;
+        }
+
+        for (const addedNode of mutation.addedNodes) {
+          if (!(addedNode instanceof Element)) {
+            continue;
+          }
+          if (addedNode.matches("style, link[rel~='stylesheet']")) {
+            stylesheetChanged = true;
+            if (addedNode instanceof HTMLLinkElement) {
+              addedNode.addEventListener("load", scheduleFullScan, { once: true });
+            }
+          }
+          overrideBrightBackgroundsIn(
+            addedNode,
+            settings,
+            originalBackgrounds
+          );
+        }
+      }
+
+      if (stylesheetChanged) {
+        scheduleFullScan();
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["class", "style"]
+    });
+
+    return {
+      stop() {
+        observer.disconnect();
+        originalBackgrounds.forEach((original, element) => {
+          if (!element.isConnected) {
+            return;
+          }
+          if (original.value) {
+            element.style.setProperty(
+              "background-color",
+              original.value,
+              original.priority
+            );
+          } else {
+            element.style.removeProperty("background-color");
+          }
+        });
+        originalBackgrounds.clear();
+      }
+    };
   }
 
   function playOverlayTransition(preloadColor, transitionDurationMs, initialHoldMs) {
@@ -355,15 +650,15 @@
   }
 
   function setupTabSwitchTransition(settings) {
-    if (!settings.tabSwitchTransitionEnabled) {
-      return;
-    }
-
     let transitionToken = 0;
 
     const onHidden = () => {
       transitionToken += 1;
-      if (!isBrightPage(settings)) {
+      if (
+        !settings.tabSwitchTransitionEnabled ||
+        !isEnabledOnCurrentPage(settings) ||
+        !isBrightPage(settings)
+      ) {
         removeTransitionOverlay();
         return;
       }
@@ -374,7 +669,11 @@
 
     const onVisible = () => {
       const token = ++transitionToken;
-      if (!isBrightPage(settings)) {
+      if (
+        !settings.tabSwitchTransitionEnabled ||
+        !isEnabledOnCurrentPage(settings) ||
+        !isBrightPage(settings)
+      ) {
         removeTransitionOverlay();
         return;
       }
@@ -421,20 +720,78 @@
   }
 
   const settings = parseAndValidateSettings(rawSettings);
+  const suppressInitialTransition = consumeSameOriginNavigationMarker();
+  let backgroundOverrideController = null;
 
-  if (!settings.applyOnAllPages) {
+  const syncBackgroundOverrides = () => {
+    const shouldOverride =
+      isEnabledOnCurrentPage(settings) &&
+      settings.darkenBrightBackgroundsEnabled;
+
+    if (shouldOverride && !backgroundOverrideController) {
+      backgroundOverrideController = setupBrightBackgroundOverrides(settings);
+    } else if (!shouldOverride && backgroundOverrideController) {
+      backgroundOverrideController.stop();
+      backgroundOverrideController = null;
+    }
+  };
+
+  if (api.storage && api.storage.onChanged) {
+    api.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "sync") {
+        return;
+      }
+
+      Object.entries(changes).forEach(([key, change]) => {
+        if (change.newValue === undefined) {
+          delete rawSettings[key];
+        } else {
+          rawSettings[key] = change.newValue;
+        }
+      });
+
+      Object.assign(
+        settings,
+        parseAndValidateSettings({ ...DEFAULT_SETTINGS, ...rawSettings })
+      );
+
+      const backgroundSettingsChanged = [
+        "applyOnAllPages",
+        "siteListMode",
+        "siteListHosts",
+        "excludedHosts",
+        "darkenBrightBackgroundsEnabled",
+        "darkBackgroundColor",
+        "backgroundBrightnessThreshold"
+      ].some((key) => Object.prototype.hasOwnProperty.call(changes, key));
+
+      if (backgroundSettingsChanged && backgroundOverrideController) {
+        backgroundOverrideController.stop();
+        backgroundOverrideController = null;
+      }
+
+      if (!isEnabledOnCurrentPage(settings)) {
+        removeTransitionOverlay();
+      }
+      syncBackgroundOverrides();
+    });
+  }
+
+  if (!isEnabledOnCurrentPage(settings)) {
     removeTransitionOverlay();
     return;
   }
 
-  if (!shouldRunOnCurrentPage(settings)) {
+  setupSameOriginNavigationTracking(settings);
+  setupTabSwitchTransition(settings);
+  syncBackgroundOverrides();
+
+  if (suppressInitialTransition) {
     removeTransitionOverlay();
     return;
   }
 
   showInitialOverlay(settings.preloadColor);
-
-  setupTabSwitchTransition(settings);
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => transitionOnPageLoad(settings), {

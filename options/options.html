@@ -87,6 +87,24 @@
             <label for="brightnessThreshold" data-i18n="brightnessThreshold">Brightness threshold (0-255)</label>
             <input type="number" id="brightnessThreshold" min="0" max="255" step="1">
           </div>
+
+          <label class="switch spaced-switch">
+            <input type="checkbox" id="darkenBrightBackgroundsEnabled">
+            <span data-i18n="darkenBrightBackgrounds">Replace bright CSS backgrounds</span>
+          </label>
+
+          <div class="field-grid">
+            <label for="darkBackgroundColor" data-i18n="darkBackgroundColor">Replacement background color</label>
+            <div class="color-pair">
+              <input type="color" id="darkBackgroundColor">
+              <input type="text" id="darkBackgroundColorText" inputmode="text" spellcheck="false">
+            </div>
+          </div>
+
+          <div class="field-grid">
+            <label for="backgroundBrightnessThreshold" data-i18n="backgroundBrightnessThreshold">CSS background threshold (0-255)</label>
+            <input type="number" id="backgroundBrightnessThreshold" min="0" max="255" step="1">
+          </div>
         </section>
 
         <section class="section">
