@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Dark Background Anti-Flash",
   "description": "Reduces bright flashes on bright pages using a temporary dark overlay that fades out smoothly.",
-  "version": "1.1.11",
+  "version": "1.2.0",
   "permissions": [
     "menus",
     "storage"
@@ -42,7 +42,6 @@
         "content/content-script.js"
       ],
       "run_at": "document_start",
-      "all_frames": true,
       "match_about_blank": true
     }
   ],

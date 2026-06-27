@@ -8,7 +8,7 @@ Dark Background Anti-Flash
 
 ## Version
 
-Current version in `manifest.json`: `1.1.11`
+Current version in `manifest.json`: `1.2.0`
 
 ## Packaging (ZIP for upload)
 

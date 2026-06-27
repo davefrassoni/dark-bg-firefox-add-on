@@ -24,6 +24,8 @@ A small Firefox extension that reduces the sudden white flash that can appear wh
 - `Delay before transition`: how long to hold the dark overlay before fading.
 - `Tab switch transition`: optional fade when returning to an existing tab.
 - `Brightness threshold`: only pages at or above this brightness get the overlay.
+- `Replace bright CSS backgrounds`: persistently overrides bright solid background colors with a chosen dark color, including content added after page load.
+- `CSS background threshold`: controls which CSS background colors are replaced.
 - `Site Access`: use a blacklist to skip listed pages, or a whitelist to run only on listed pages.
 
 ## Local Testing
@@ -36,6 +38,8 @@ A small Firefox extension that reduces the sudden white flash that can appear wh
 6. Change the settings page language and confirm labels update immediately.
 7. Open a bright page and confirm the dark overlay fades out cleanly.
 8. Change the Site Access mode, save, reload the test page, and confirm whitelist or blacklist behavior.
+9. Enable `Replace bright CSS backgrounds`, then confirm bright solid backgrounds (including dynamically added elements) use the selected replacement color.
+10. Follow a same-site link from a bright page and confirm the page-load overlay is skipped.
 
 ## Packaging
 

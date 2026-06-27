@@ -9,6 +9,9 @@ const DEFAULT_SETTINGS = {
   tabSwitchTransitionDurationMs: 1800,
   tabSwitchInitialHoldMs: 220,
   brightnessThreshold: 185,
+  darkenBrightBackgroundsEnabled: false,
+  darkBackgroundColor: "#121417",
+  backgroundBrightnessThreshold: 210,
   siteListMode: "blacklist",
   siteListHosts: "",
   uiLanguage: "auto",
@@ -46,6 +49,9 @@ const TRANSLATIONS = {
     tabSwitchEnabled: "Apply transition when returning to a tab",
     brightPageDetection: "Bright Page Detection",
     brightnessThreshold: "Brightness threshold (0-255)",
+    darkenBrightBackgrounds: "Replace bright CSS backgrounds",
+    darkBackgroundColor: "Replacement background color",
+    backgroundBrightnessThreshold: "CSS background threshold (0-255)",
     siteAccess: "Site Access",
     listBehavior: "List behavior",
     blacklistOption: "Disable on listed pages",
@@ -74,6 +80,9 @@ const TRANSLATIONS = {
     tabSwitchEnabled: "Aplicar transición al volver a una pestaña",
     brightPageDetection: "Detección de páginas claras",
     brightnessThreshold: "Umbral de brillo (0-255)",
+    darkenBrightBackgrounds: "Reemplazar fondos CSS claros",
+    darkBackgroundColor: "Color de fondo de reemplazo",
+    backgroundBrightnessThreshold: "Umbral de fondos CSS (0-255)",
     siteAccess: "Acceso a sitios",
     listBehavior: "Comportamiento de la lista",
     blacklistOption: "Desactivar en páginas listadas",
@@ -102,6 +111,9 @@ const TRANSLATIONS = {
     tabSwitchEnabled: "Aplicar transição ao voltar para uma aba",
     brightPageDetection: "Detecção de páginas claras",
     brightnessThreshold: "Limite de brilho (0-255)",
+    darkenBrightBackgrounds: "Substituir fundos CSS claros",
+    darkBackgroundColor: "Cor de fundo substituta",
+    backgroundBrightnessThreshold: "Limite de fundos CSS (0-255)",
     siteAccess: "Acesso a sites",
     listBehavior: "Comportamento da lista",
     blacklistOption: "Desativar nas páginas listadas",
@@ -130,6 +142,9 @@ const TRANSLATIONS = {
     tabSwitchEnabled: "Appliquer la transition au retour sur un onglet",
     brightPageDetection: "Détection des pages claires",
     brightnessThreshold: "Seuil de luminosité (0-255)",
+    darkenBrightBackgrounds: "Remplacer les arrière-plans CSS clairs",
+    darkBackgroundColor: "Couleur d’arrière-plan de remplacement",
+    backgroundBrightnessThreshold: "Seuil des arrière-plans CSS (0-255)",
     siteAccess: "Accès aux sites",
     listBehavior: "Comportement de la liste",
     blacklistOption: "Désactiver sur les pages listées",
@@ -158,6 +173,9 @@ const TRANSLATIONS = {
     tabSwitchEnabled: "Übergang beim Zurückkehren zu einem Tab anwenden",
     brightPageDetection: "Erkennung heller Seiten",
     brightnessThreshold: "Helligkeitsschwelle (0-255)",
+    darkenBrightBackgrounds: "Helle CSS-Hintergründe ersetzen",
+    darkBackgroundColor: "Ersatz-Hintergrundfarbe",
+    backgroundBrightnessThreshold: "CSS-Hintergrundschwelle (0-255)",
     siteAccess: "Website-Zugriff",
     listBehavior: "Listenverhalten",
     blacklistOption: "Auf gelisteten Seiten deaktivieren",
@@ -186,6 +204,9 @@ const TRANSLATIONS = {
     tabSwitchEnabled: "返回标签页时应用过渡",
     brightPageDetection: "亮色页面检测",
     brightnessThreshold: "亮度阈值（0-255）",
+    darkenBrightBackgrounds: "替换明亮的 CSS 背景",
+    darkBackgroundColor: "替换背景颜色",
+    backgroundBrightnessThreshold: "CSS 背景阈值（0-255）",
     siteAccess: "网站访问",
     listBehavior: "列表行为",
     blacklistOption: "在列出的页面上禁用",
@@ -214,6 +235,9 @@ const TRANSLATIONS = {
     tabSwitchEnabled: "タブに戻るときにトランジションを適用",
     brightPageDetection: "明るいページの検出",
     brightnessThreshold: "明るさのしきい値 (0-255)",
+    darkenBrightBackgrounds: "明るい CSS 背景を置換",
+    darkBackgroundColor: "置換する背景色",
+    backgroundBrightnessThreshold: "CSS 背景のしきい値 (0-255)",
     siteAccess: "サイトアクセス",
     listBehavior: "リストの動作",
     blacklistOption: "リスト内のページで無効にする",
@@ -242,6 +266,9 @@ const TRANSLATIONS = {
     tabSwitchEnabled: "탭으로 돌아올 때 전환 적용",
     brightPageDetection: "밝은 페이지 감지",
     brightnessThreshold: "밝기 임계값 (0-255)",
+    darkenBrightBackgrounds: "밝은 CSS 배경 바꾸기",
+    darkBackgroundColor: "대체 배경색",
+    backgroundBrightnessThreshold: "CSS 배경 임계값 (0-255)",
     siteAccess: "사이트 접근",
     listBehavior: "목록 동작",
     blacklistOption: "목록의 페이지에서 비활성화",
@@ -270,6 +297,9 @@ const TRANSLATIONS = {
     tabSwitchEnabled: "Применять переход при возврате на вкладку",
     brightPageDetection: "Обнаружение светлых страниц",
     brightnessThreshold: "Порог яркости (0-255)",
+    darkenBrightBackgrounds: "Заменять светлые CSS-фоны",
+    darkBackgroundColor: "Цвет фона для замены",
+    backgroundBrightnessThreshold: "Порог CSS-фона (0-255)",
     siteAccess: "Доступ к сайтам",
     listBehavior: "Поведение списка",
     blacklistOption: "Отключать на страницах из списка",
@@ -298,6 +328,9 @@ const TRANSLATIONS = {
     tabSwitchEnabled: "تطبيق الانتقال عند الرجوع إلى لسان",
     brightPageDetection: "اكتشاف الصفحات الساطعة",
     brightnessThreshold: "حد السطوع (0-255)",
+    darkenBrightBackgrounds: "استبدال خلفيات CSS الساطعة",
+    darkBackgroundColor: "لون الخلفية البديل",
+    backgroundBrightnessThreshold: "حد خلفية CSS (0-255)",
     siteAccess: "الوصول إلى المواقع",
     listBehavior: "سلوك القائمة",
     blacklistOption: "تعطيل على الصفحات المدرجة",
@@ -325,6 +358,14 @@ const fields = {
   tabSwitchTransitionDurationMs: document.getElementById("tabSwitchTransitionDurationMs"),
   tabSwitchInitialHoldMs: document.getElementById("tabSwitchInitialHoldMs"),
   brightnessThreshold: document.getElementById("brightnessThreshold"),
+  darkenBrightBackgroundsEnabled: document.getElementById(
+    "darkenBrightBackgroundsEnabled"
+  ),
+  darkBackgroundColor: document.getElementById("darkBackgroundColor"),
+  darkBackgroundColorText: document.getElementById("darkBackgroundColorText"),
+  backgroundBrightnessThreshold: document.getElementById(
+    "backgroundBrightnessThreshold"
+  ),
   siteListMode: document.getElementById("siteListMode"),
   siteListHosts: document.getElementById("siteListHosts"),
   resetDefaults: document.getElementById("resetDefaults")
@@ -478,6 +519,12 @@ function populateForm(settings) {
   fields.tabSwitchTransitionDurationMs.value = settings.tabSwitchTransitionDurationMs;
   fields.tabSwitchInitialHoldMs.value = settings.tabSwitchInitialHoldMs;
   fields.brightnessThreshold.value = settings.brightnessThreshold;
+  fields.darkenBrightBackgroundsEnabled.checked =
+    settings.darkenBrightBackgroundsEnabled;
+  fields.darkBackgroundColor.value = settings.darkBackgroundColor;
+  fields.darkBackgroundColorText.value = settings.darkBackgroundColor;
+  fields.backgroundBrightnessThreshold.value =
+    settings.backgroundBrightnessThreshold;
   fields.siteListMode.value = normalizeSiteListMode(settings.siteListMode);
   fields.siteListHosts.value = settings.siteListHosts || "";
 }
@@ -521,6 +568,18 @@ function readForm() {
       255,
       DEFAULT_SETTINGS.brightnessThreshold
     ),
+    darkenBrightBackgroundsEnabled:
+      fields.darkenBrightBackgroundsEnabled.checked,
+    darkBackgroundColor: normalizeHexColor(
+      fields.darkBackgroundColorText.value,
+      DEFAULT_SETTINGS.darkBackgroundColor
+    ),
+    backgroundBrightnessThreshold: clamp(
+      fields.backgroundBrightnessThreshold.value,
+      0,
+      255,
+      DEFAULT_SETTINGS.backgroundBrightnessThreshold
+    ),
     siteListMode: normalizeSiteListMode(fields.siteListMode.value),
     siteListHosts: fields.siteListHosts.value,
     excludedHosts: ""
@@ -557,6 +616,7 @@ fields.uiLanguage.addEventListener("change", async () => {
 });
 
 syncColorInputs(fields.preloadColor, fields.preloadColorText);
+syncColorInputs(fields.darkBackgroundColor, fields.darkBackgroundColorText);
 
 (async () => {
   const stored = await storageGet({});
