@@ -34,8 +34,8 @@ These steps reflect the Chrome Web Store process in July 2026.
    - Upload the 128x128 icon from `shared/icons/icon-128.png`.
    - Upload at least one screenshot at 1280x800 or 640x400. Show the real
      options page and/or the extension working; do not use misleading mockups.
-   - Add the required 440x280 small promotional image. The 1400x560 marquee
-     image is optional.
+   - Upload `store-assets/promo-small-440x280.png` as the required 440x280
+     small promotional image. The 1400x560 marquee image is optional.
 6. Complete **Privacy practices** using the suggested text below. Confirm the
    declarations against the actual dashboard wording before submitting.
 7. Complete **Distribution**. Use **Private** for trusted-tester validation,
