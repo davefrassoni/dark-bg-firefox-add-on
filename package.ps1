@@ -1,54 +1,57 @@
 param(
+  [ValidateSet("All", "Firefox", "Chrome")]
+  [string]$Browser = "All",
   [string]$Version
 )
 
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-
-if (-not $Version) {
-  $manifestPath = Join-Path $root "manifest.json"
-  $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
-  $Version = [string]$manifest.version
+$sharedDir = Join-Path $root "shared"
+$buildDir = Join-Path $root "build"
+$distDir = Join-Path $root "dist"
+$platforms = if ($Browser -eq "All") {
+  @("firefox", "chrome")
+} else {
+  @($Browser.ToLowerInvariant())
 }
 
-$distDir = Join-Path $root "dist"
-$itemsToPackage = @(
-  "manifest.json",
-  "background.js",
-  "content",
-  "options",
-  "icons/icon-16.png",
-  "icons/icon-32.png",
-  "icons/icon-48.png",
-  "icons/icon-96.png",
-  "icons/icon-128.png"
-)
-$archiveNames = @(
-  "dark-background-anti-flash-v$Version.zip",
-  "dark-background-anti-flash-v$Version-amo.zip"
-)
+if ($Browser -eq "All") {
+  $sourceVersions = @(
+    $platforms | ForEach-Object {
+      $sourceManifestPath = Join-Path (Join-Path $root $_) "manifest.json"
+      $sourceManifest = Get-Content -Raw -LiteralPath $sourceManifestPath |
+        ConvertFrom-Json
+      [string]$sourceManifest.version
+    } | Select-Object -Unique
+  )
+
+  if ($sourceVersions.Count -ne 1) {
+    throw "Firefox and Chrome manifest versions must match before packaging."
+  }
+}
 
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-function Add-FileToArchive {
+function Assert-PathInsideRoot {
   param(
     [Parameter(Mandatory = $true)]
-    [System.IO.Compression.ZipArchive]$Archive,
-    [Parameter(Mandatory = $true)]
-    [string]$SourcePath,
-    [Parameter(Mandatory = $true)]
-    [string]$EntryName
+    [string]$Path
   )
 
-  $normalizedEntryName = $EntryName -replace "\\", "/"
-  [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
-    $Archive,
-    $SourcePath,
-    $normalizedEntryName,
-    [System.IO.Compression.CompressionLevel]::Optimal
-  ) | Out-Null
+  $fullRoot = [System.IO.Path]::GetFullPath($root).TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar
+  )
+  $fullPath = [System.IO.Path]::GetFullPath($Path)
+  $requiredPrefix = $fullRoot + [System.IO.Path]::DirectorySeparatorChar
+
+  if (-not $fullPath.StartsWith(
+    $requiredPrefix,
+    [System.StringComparison]::OrdinalIgnoreCase
+  )) {
+    throw "Refusing to modify a path outside the repository: $fullPath"
+  }
 }
 
 function Get-RelativeEntryPath {
@@ -59,44 +62,60 @@ function Get-RelativeEntryPath {
     [string]$TargetPath
   )
 
-  $baseUri = New-Object System.Uri(((Resolve-Path -LiteralPath $BasePath).Path.TrimEnd("\") + "\"))
-  $targetUri = New-Object System.Uri((Resolve-Path -LiteralPath $TargetPath).Path)
-  return [System.Uri]::UnescapeDataString($baseUri.MakeRelativeUri($targetUri).ToString())
+  $baseUri = New-Object System.Uri(
+    ([System.IO.Path]::GetFullPath($BasePath).TrimEnd("\") + "\")
+  )
+  $targetUri = New-Object System.Uri([System.IO.Path]::GetFullPath($TargetPath))
+  return [System.Uri]::UnescapeDataString(
+    $baseUri.MakeRelativeUri($targetUri).ToString()
+  )
 }
 
-function Add-PathToArchive {
+function New-PlatformPackage {
   param(
     [Parameter(Mandatory = $true)]
-    [System.IO.Compression.ZipArchive]$Archive,
-    [Parameter(Mandatory = $true)]
-    [string]$RelativePath
+    [string]$Platform
   )
 
-  $absolutePath = Join-Path $root $RelativePath
-  $resolvedPath = (Resolve-Path -LiteralPath $absolutePath).Path
-  $item = Get-Item -LiteralPath $resolvedPath
+  $platformDir = Join-Path $root $Platform
+  $manifestPath = Join-Path $platformDir "manifest.json"
+  $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+  $manifestVersion = [string]$manifest.version
 
-  if ($item.PSIsContainer) {
-    $files = Get-ChildItem -LiteralPath $resolvedPath -File -Recurse | Sort-Object FullName
-    foreach ($file in $files) {
-      $entryName = Get-RelativeEntryPath -BasePath $root -TargetPath $file.FullName
-      Add-FileToArchive -Archive $Archive -SourcePath $file.FullName -EntryName $entryName
-    }
-    return
+  if ($Version -and $Version -ne $manifestVersion) {
+    throw (
+      "Requested version $Version does not match " +
+      "$Platform/manifest.json version $manifestVersion. " +
+      "Update both manifests before packaging."
+    )
   }
 
-  Add-FileToArchive -Archive $Archive -SourcePath $resolvedPath -EntryName $RelativePath
-}
+  $packageVersion = if ($Version) { $Version } else { $manifestVersion }
+  $stagingDir = Join-Path $buildDir $Platform
+  Assert-PathInsideRoot -Path $stagingDir
 
-New-Item -ItemType Directory -Force -Path $distDir | Out-Null
+  if (Test-Path -LiteralPath $stagingDir) {
+    Remove-Item -LiteralPath $stagingDir -Recurse -Force
+  }
+  New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
 
-foreach ($archiveName in $archiveNames) {
+  Get-ChildItem -LiteralPath $sharedDir -Force |
+    Copy-Item -Destination $stagingDir -Recurse -Force
+  Get-ChildItem -LiteralPath $platformDir -Force |
+    Copy-Item -Destination $stagingDir -Recurse -Force
+
+  $archiveName = "dark-background-anti-flash-$Platform-v$packageVersion.zip"
   $archivePath = Join-Path $distDir $archiveName
+  Assert-PathInsideRoot -Path $archivePath
+
   if (Test-Path -LiteralPath $archivePath) {
     Remove-Item -LiteralPath $archivePath -Force
   }
 
-  $fileStream = [System.IO.File]::Open($archivePath, [System.IO.FileMode]::CreateNew)
+  $fileStream = [System.IO.File]::Open(
+    $archivePath,
+    [System.IO.FileMode]::CreateNew
+  )
   try {
     $archive = New-Object System.IO.Compression.ZipArchive(
       $fileStream,
@@ -104,8 +123,18 @@ foreach ($archiveName in $archiveNames) {
       $false
     )
     try {
-      foreach ($itemToPackage in $itemsToPackage) {
-        Add-PathToArchive -Archive $archive -RelativePath $itemToPackage
+      $files = Get-ChildItem -LiteralPath $stagingDir -File -Recurse |
+        Sort-Object FullName
+      foreach ($file in $files) {
+        $entryName = Get-RelativeEntryPath `
+          -BasePath $stagingDir `
+          -TargetPath $file.FullName
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+          $archive,
+          $file.FullName,
+          $entryName,
+          [System.IO.Compression.CompressionLevel]::Optimal
+        ) | Out-Null
       }
     } finally {
       $archive.Dispose()
@@ -114,5 +143,12 @@ foreach ($archiveName in $archiveNames) {
     $fileStream.Dispose()
   }
 
-  Write-Output "Created $archivePath"
+  Write-Output "Built unpacked extension: $stagingDir"
+  Write-Output "Created store package: $archivePath"
+}
+
+New-Item -ItemType Directory -Force -Path $buildDir, $distDir | Out-Null
+
+foreach ($platform in $platforms) {
+  New-PlatformPackage -Platform $platform
 }
