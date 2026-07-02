@@ -1,59 +1,87 @@
 # Dark Background Anti-Flash
 
-A small Firefox extension that reduces the sudden white flash that can appear while bright pages load or when returning to a bright tab.
+A cross-browser Manifest V3 extension for Firefox and Chrome. It reduces bright
+flashes while pages load or when returning to a bright tab.
 
-[Install it from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/dark-background-anti-flash/).
+[Install the Firefox version](https://addons.mozilla.org/en-US/firefox/addon/dark-background-anti-flash/).
 
-## What It Does
+## Features
 
-- Shows a temporary dark overlay before a bright page is ready.
-- Fades the overlay away smoothly instead of snapping to white.
-- Can repeat the same protection when you return to an existing tab.
-- Leaves Firefox's built-in New Tab page and favorites alone.
-- Stores settings with Firefox sync storage and does not collect data.
+- Temporary dark overlay with configurable hold and fade durations.
+- Optional protection when returning to an existing tab.
+- Bright-page detection and optional replacement of bright CSS backgrounds.
+- Per-site blacklist or whitelist.
+- Settings stored with browser sync storage; no analytics or data collection.
+- Options UI in English, Spanish, Portuguese, French, German, Chinese,
+  Japanese, Korean, Russian, and Arabic.
 
-## Settings
+## Project structure
 
-- Click the toolbar button to open the options page.
-- Right-click the toolbar button and choose `Open options`.
-- If the button is not visible, open Firefox's Extensions button, find `Dark Background Anti-Flash`, and pin it to the toolbar.
-- `Settings page language`: use `Auto` or choose English, Spanish, Portuguese, French, German, Chinese, Japanese, Korean, Russian, or Arabic.
-- `Apply on all websites`: master switch for the page overlay.
-- `Preload dark color`: color used while the page is guarded.
-- `Transition duration`: fade-out speed for page loads.
-- `Delay before transition`: how long to hold the dark overlay before fading.
-- `Tab switch transition`: optional fade when returning to an existing tab.
-- `Brightness threshold`: only pages at or above this brightness get the overlay.
-- `Replace bright CSS backgrounds`: persistently overrides bright solid background colors with a chosen dark color, including content added after page load.
-- `CSS background threshold`: controls which CSS background colors are replaced.
-- `Site Access`: use a blacklist to skip listed pages, or a whitelist to run only on listed pages.
+- `shared/`: background logic, content script, options UI, and icons used by
+  both browsers.
+- `firefox/manifest.json`: Firefox-specific manifest (`menus`,
+  `background.scripts`, and Gecko metadata).
+- `chrome/manifest.json`: Chrome-specific manifest (`contextMenus` and an MV3
+  service worker).
+- `package.ps1`: merges shared and browser-specific files into loadable builds
+  and store-ready ZIP archives.
 
-## Local Testing
+Keep the version in both manifests identical for every release.
 
-1. Open `about:debugging#/runtime/this-firefox` in Firefox.
-2. Click **Load Temporary Add-on**.
-3. Select [manifest.json](./manifest.json).
-4. Click the extension toolbar button and confirm the options page opens.
-5. Right-click the extension toolbar button and choose `Open options`.
-6. Change the settings page language and confirm labels update immediately.
-7. Open a bright page and confirm the dark overlay fades out cleanly.
-8. Change the Site Access mode, save, reload the test page, and confirm whitelist or blacklist behavior.
-9. Enable `Replace bright CSS backgrounds`, then confirm bright solid backgrounds (including dynamically added elements) use the selected replacement color.
-10. Follow a same-site link from a bright page and confirm the page-load overlay is skipped.
+## Build
 
-## Packaging
-
-Run the packager from the repository root:
+From the repository root:
 
 ```powershell
 .\package.ps1
 ```
 
-Versioned archives are written to `dist/`.
+This creates:
 
-## Project Structure
+- `build/firefox/` and `build/chrome/` for local testing.
+- `dist/dark-background-anti-flash-firefox-v<VERSION>.zip`.
+- `dist/dark-background-anti-flash-chrome-v<VERSION>.zip`.
 
-- [manifest.json](./manifest.json): Firefox MV3 manifest.
-- [background.js](./background.js): installs and migrates default settings.
-- [content/content-script.js](./content/content-script.js): detects bright pages and runs overlay transitions.
-- [options](./options): settings page UI, styles, and storage logic.
+Build only one browser with `.\package.ps1 -Browser Chrome` or
+`.\package.ps1 -Browser Firefox`.
+
+## Local testing
+
+### Chrome
+
+1. Run `.\package.ps1 -Browser Chrome`.
+2. Open `chrome://extensions`.
+3. Enable **Developer mode**.
+4. Click **Load unpacked** and select `build/chrome`.
+5. Click the toolbar button and confirm the options page opens.
+6. Test page-load and tab-switch fades on ordinary `http` and `https` pages.
+
+### Firefox
+
+1. Run `.\package.ps1 -Browser Firefox`.
+2. Open `about:debugging#/runtime/this-firefox`.
+3. Click **Load Temporary Add-on**.
+4. Select `build/firefox/manifest.json`.
+
+Browser-owned pages such as `chrome://extensions`, the Chrome Web Store, and
+Firefox `about:` pages do not allow normal content-script injection.
+
+## Chrome-specific implications
+
+- Chrome displays a broad site-access warning because automatic protection at
+  `document_start` requires `<all_urls>`. Restricting the extension to **On
+  click** in Chrome's site-access controls prevents automatic anti-flash
+  behavior.
+- Chrome does not permit this extension to modify `chrome://` pages or the
+  Chrome Web Store. Access to local `file://` pages also requires the user to
+  enable **Allow access to file URLs** on `chrome://extensions`.
+- Firefox Sync and Chrome Sync are separate. Settings do not migrate between
+  browsers even though both builds use the same settings format.
+- The Chrome background code runs as an event-driven service worker. All
+  persistent behavior remains in the shared content script and sync storage.
+
+## Publishing
+
+See [README_PUBLISHING.md](./README_PUBLISHING.md) for Chrome Web Store upload
+steps, privacy declarations, permission justifications, and the Firefox release
+checklist.

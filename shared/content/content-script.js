@@ -14,7 +14,7 @@
     return;
   }
 
-  // Respect Firefox native new-tab/favorites surfaces and only allow true blank about pages.
+  // Respect native browser pages and only allow true blank about pages.
   if (isAboutPage && !isAboutBlank) {
     return;
   }
