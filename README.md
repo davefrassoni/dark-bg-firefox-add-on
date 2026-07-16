@@ -9,6 +9,8 @@ flashes while pages load or when returning to a bright tab.
 
 - Temporary dark overlay with configurable hold and fade durations.
 - Optional protection when returning to an existing tab.
+- Transition-aware behavior: fades occur only when moving from a dark or
+  unknown surface to a bright page, including across origins.
 - Bright-page detection and optional replacement of bright CSS backgrounds.
 - Per-site blacklist or whitelist.
 - Settings stored with browser sync storage; no analytics or data collection.
@@ -78,7 +80,16 @@ Firefox `about:` pages do not allow normal content-script injection.
 - Firefox Sync and Chrome Sync are separate. Settings do not migrate between
   browsers even though both builds use the same settings format.
 - The Chrome background code runs as an event-driven service worker. All
-  persistent behavior remains in the shared content script and sync storage.
+  per-tab brightness coordination is kept in session storage so it survives
+  service-worker suspension without becoming browsing history.
+
+## Tests
+
+Run the transition-policy tests with:
+
+```powershell
+node --test tests/*.test.js
+```
 
 ## Publishing
 
