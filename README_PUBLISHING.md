@@ -32,13 +32,16 @@ These steps reflect the Chrome Web Store process in July 2026.
    - Category: **Accessibility** is the closest fit.
    - Add an accurate detailed description.
    - Upload the 128x128 icon from `shared/icons/icon-128.png`.
-   - Upload at least one screenshot at 1280x800 or 640x400. Show the real
-     options page and/or the extension working; do not use misleading mockups.
+   - Upload the five 1280x800 PNG screenshots in `store-assets/v1.2.1/` in
+     this suggested order: `screenshot-feature-overview-1280x800.png`,
+     `screenshot-options-1280x800.png`,
+     `screenshot-transitions-1280x800.png`,
+     `screenshot-brightness-1280x800.png`, and
+     `screenshot-site-access-1280x800.png`.
    - Upload `store-assets/v1.2.1/promo-small-440x280.png` as the required
      440x280 small promotional image.
    - Upload `store-assets/v1.2.1/promo-marquee-1400x560.png` as the optional
-     marquee image and `store-assets/v1.2.1/screenshot-options-1280x800.png`
-     as the required screenshot.
+     marquee image.
 6. Complete **Privacy practices** using the suggested text below. Confirm the
    declarations against the actual dashboard wording before submitting.
 7. Complete **Distribution**. Use **Private** for trusted-tester validation,
