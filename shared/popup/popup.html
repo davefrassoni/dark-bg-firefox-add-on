@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>Dark Background Anti-Flash</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Dark Background Anti-Flash</h1>
+      <p id="host-label">&nbsp;</p>
+    </div>
+    <button id="settings" class="icon" title="Settings">⚙</button>
+  </header>
+  <main>
+    <section class="toggle-row">
+      <div class="toggle-info">
+        <strong>Fade guard</strong>
+        <span>Anti-flash transitions on page &amp; tab load</span>
+      </div>
+      <button id="fade-toggle" class="pill" data-state="on">ON</button>
+    </section>
+    <section>
+      <div class="section-title">
+        <h2>Page brightness</h2>
+        <span id="brightness-value">100%</span>
+      </div>
+      <input type="range" id="brightness-slider" min="30" max="150" step="5" value="100">
+      <div class="brightness-actions">
+        <button id="brightness-reset" class="small">Reset</button>
+      </div>
+    </section>
+    <div id="status" role="status"></div>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
