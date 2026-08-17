@@ -317,10 +317,6 @@ api.runtime.onInstalled.addListener(async () => {
   await storageSet(merged);
 });
 
-if (api.action && api.action.onClicked) {
-  api.action.onClicked.addListener(openOptionsPage);
-}
-
 if (menuApi && menuApi.onClicked) {
   menuApi.onClicked.addListener((info) => {
     if (info.menuItemId === OPEN_OPTIONS_MENU_ID) {

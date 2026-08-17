@@ -5,6 +5,8 @@
   const MESSAGE_BRIGHTNESS_REPORT = "dark-anti-flash:brightness-report";
   const MESSAGE_SET_TAB_GUARD = "dark-anti-flash:set-tab-guard";
   const MESSAGE_TAB_ACTIVATED = "dark-anti-flash:tab-activated";
+  const MESSAGE_SET_PAGE_BRIGHTNESS = "dark-anti-flash:set-page-brightness";
+  const PAGE_BRIGHTNESS_STORAGE_KEY = "darkAntiFlashPageBrightness";
   const {
     BRIGHTNESS_BRIGHT,
     BRIGHTNESS_DARK,
@@ -59,6 +61,34 @@
     return new Promise((resolve) => {
       api.storage.sync.get(defaults, (value) => resolve(value));
     });
+  }
+
+  function storageGetLocal(defaults) {
+    try {
+      const result = api.storage.local.get(defaults);
+      if (result && typeof result.then === "function") {
+        return result;
+      }
+    } catch (error) {
+      // Fall back to callback style.
+    }
+
+    return new Promise((resolve) => {
+      api.storage.local.get(defaults, (value) => resolve(value));
+    });
+  }
+
+  function applyPageBrightness(value) {
+    const root = document.documentElement;
+    if (!root) {
+      return;
+    }
+    const clamped = clamp(value, 30, 150, 100);
+    if (clamped === 100) {
+      root.style.removeProperty("filter");
+    } else {
+      root.style.setProperty("filter", `brightness(${clamped}%)`);
+    }
   }
 
   function clamp(value, min, max, fallback) {
@@ -928,6 +958,38 @@
   }
 
   const settings = parseAndValidateSettings(rawSettings);
+
+  // The manual per-page brightness dimmer is independent of the anti-flash
+  // guard settings above, so it applies even on pages excluded by the site
+  // list or with the guard turned off entirely.
+  const storedPageBrightness = await storageGetLocal({
+    [PAGE_BRIGHTNESS_STORAGE_KEY]: {}
+  });
+  applyPageBrightness(
+    (storedPageBrightness[PAGE_BRIGHTNESS_STORAGE_KEY] || {})[
+      window.location.hostname
+    ]
+  );
+
+  api.runtime.onMessage.addListener((message) => {
+    if (message && message.type === MESSAGE_SET_PAGE_BRIGHTNESS) {
+      applyPageBrightness(message.value);
+    }
+    return false;
+  });
+
+  if (api.storage && api.storage.onChanged) {
+    api.storage.onChanged.addListener((changes, areaName) => {
+      if (
+        areaName === "local" &&
+        Object.prototype.hasOwnProperty.call(changes, PAGE_BRIGHTNESS_STORAGE_KEY)
+      ) {
+        const updatedMap = changes[PAGE_BRIGHTNESS_STORAGE_KEY].newValue || {};
+        applyPageBrightness(updatedMap[window.location.hostname]);
+      }
+    });
+  }
+
   const stateContext =
     (await sendRuntimeMessage({ type: MESSAGE_DOCUMENT_INIT })) || {};
   const incomingBrightness =
