@@ -17,7 +17,7 @@ function readManifest(browserName) {
 test("browser manifests share the release version", () => {
   const chromeManifest = readManifest("chrome");
   const firefoxManifest = readManifest("firefox");
-  assert.equal(chromeManifest.version, "1.2.1");
+  assert.equal(chromeManifest.version, "1.3.0");
   assert.equal(firefoxManifest.version, chromeManifest.version);
 });
 
