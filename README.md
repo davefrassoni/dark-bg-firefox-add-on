@@ -90,9 +90,3 @@ Run the transition-policy tests with:
 ```powershell
 node --test tests/*.test.js
 ```
-
-## Publishing
-
-See [README_PUBLISHING.md](./README_PUBLISHING.md) for Chrome Web Store upload
-steps, privacy declarations, permission justifications, and the Firefox release
-checklist.
