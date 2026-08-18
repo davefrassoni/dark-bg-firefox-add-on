@@ -3,7 +3,7 @@
 A cross-browser Manifest V3 extension for Firefox and Chrome. It reduces bright
 flashes while pages load or when returning to a bright tab.
 
-[Install the Firefox version](https://addons.mozilla.org/en-US/firefox/addon/dark-background-anti-flash/).
+[Landing page](https://davefrassoni.com/darkbg/) · [Install for Firefox](https://addons.mozilla.org/en-US/firefox/addon/dark-background-anti-flash/) · [Install for Chrome](https://chromewebstore.google.com/detail/dark-background-anti-flas/dkipfcfdojolkdecalknlonckfleobee)
 
 ## Features
 
