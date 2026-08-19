@@ -973,7 +973,17 @@
     });
   }
 
-  const stored = await storageGet({});
+  // Show a guard immediately, before any of the async storage/messaging
+  // below. Waiting on those first (a sync-storage read, a local-storage
+  // read, and a round-trip to the background service worker, which may
+  // need a cold start) let the browser's own paint occasionally win that
+  // race and flash the real page before the guard ever appeared. The
+  // default color is a safe guess for the common case (a fresh navigation
+  // with no known-bright previous state); it gets repainted or removed
+  // below once the real settings and brightness state are known.
+  showGuardOverlay(DEFAULT_SETTINGS.preloadColor);
+
+  const stored = await storageGet(null);
   const rawSettings = { ...DEFAULT_SETTINGS, ...stored };
   if (stored.siteListHosts === undefined && stored.excludedHosts) {
     rawSettings.siteListHosts = stored.excludedHosts;

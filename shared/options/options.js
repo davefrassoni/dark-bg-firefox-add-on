@@ -619,7 +619,7 @@ syncColorInputs(fields.preloadColor, fields.preloadColorText);
 syncColorInputs(fields.darkBackgroundColor, fields.darkBackgroundColorText);
 
 (async () => {
-  const stored = await storageGet({});
+  const stored = await storageGet(null);
   const settings = { ...DEFAULT_SETTINGS, ...stored };
   if (stored.siteListHosts === undefined && stored.excludedHosts) {
     settings.siteListHosts = stored.excludedHosts;

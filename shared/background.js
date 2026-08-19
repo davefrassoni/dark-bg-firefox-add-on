@@ -271,7 +271,7 @@ function shouldReplaceLegacyValue(existingValue, legacyValue) {
 }
 
 api.runtime.onInstalled.addListener(async () => {
-  const existing = await storageGet({});
+  const existing = await storageGet(null);
   const merged = { ...DEFAULT_SETTINGS, ...existing };
 
   // Older installs used a shorter fade. Keep intentional user changes, but
