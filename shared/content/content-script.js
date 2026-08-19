@@ -983,13 +983,33 @@
   // below once the real settings and brightness state are known.
   showGuardOverlay(DEFAULT_SETTINGS.preloadColor);
 
+  // Register every runtime.onMessage listener synchronously too, before any
+  // of the async storage/messaging below. WebExtension messaging does not
+  // queue an unheard message for a listener that registers later -- it is
+  // simply dropped. Registering only after the awaits left a real window
+  // where a genuine tab activation (or a background-tab guard message)
+  // could arrive before this content script was listening, leaving the
+  // guard stuck solid ("black screen") or never armed at all (a bright page
+  // shows with no fade). settings starts as parsed defaults and is mutated
+  // in place (not reassigned) once the real settings load, so this early
+  // listener always sees the current values on every later invocation.
+  const settings = parseAndValidateSettings(DEFAULT_SETTINGS);
+  setupTabStateMessages(settings);
+
+  api.runtime.onMessage.addListener((message) => {
+    if (message && message.type === MESSAGE_SET_PAGE_BRIGHTNESS) {
+      applyPageBrightness(message.value);
+    }
+    return false;
+  });
+
   const stored = await storageGet(null);
   const rawSettings = { ...DEFAULT_SETTINGS, ...stored };
   if (stored.siteListHosts === undefined && stored.excludedHosts) {
     rawSettings.siteListHosts = stored.excludedHosts;
   }
 
-  const settings = parseAndValidateSettings(rawSettings);
+  Object.assign(settings, parseAndValidateSettings(rawSettings));
 
   // The manual per-page brightness dimmer is independent of the anti-flash
   // guard settings above, so it applies even on pages excluded by the site
@@ -1002,13 +1022,6 @@
       window.location.hostname
     ]
   );
-
-  api.runtime.onMessage.addListener((message) => {
-    if (message && message.type === MESSAGE_SET_PAGE_BRIGHTNESS) {
-      applyPageBrightness(message.value);
-    }
-    return false;
-  });
 
   if (api.storage && api.storage.onChanged) {
     api.storage.onChanged.addListener((changes, areaName) => {
@@ -1101,8 +1114,6 @@
       }
     });
   }
-
-  setupTabStateMessages(settings);
 
   if (!isEnabledOnCurrentPage(settings)) {
     removeTransitionOverlay();
