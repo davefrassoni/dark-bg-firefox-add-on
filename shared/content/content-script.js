@@ -969,6 +969,44 @@
     });
   }
 
+  // Local backstop, independent of background.js: if the background page
+  // (an "event page" in Firefox, similar in spirit to Chrome's service
+  // worker) is suspended or its message never arrives for any reason, the
+  // guard could otherwise stay stuck solid forever with nothing to un-stick
+  // it. A short delay after every tab activation, if it's still fully
+  // opaque, resolve it from fresh local brightness detection instead.
+  function setupVisibilityBackstop(settings) {
+    document.addEventListener("visibilitychange", () => {
+      if (
+        document.visibilityState !== "visible" ||
+        !isEnabledOnCurrentPage(settings)
+      ) {
+        return;
+      }
+
+      setTimeout(() => {
+        const overlay = document.getElementById(OVERLAY_ID);
+        if (!overlay || overlay.style.opacity !== "1") {
+          return;
+        }
+
+        const nextBrightness = reportCurrentBrightness(settings, true);
+        if (
+          settings.tabSwitchTransitionEnabled &&
+          nextBrightness === BRIGHTNESS_BRIGHT
+        ) {
+          playOverlayTransition(
+            settings.preloadColor,
+            settings.tabSwitchTransitionDurationMs,
+            settings.tabSwitchInitialHoldMs
+          );
+        } else {
+          removeTransitionOverlay();
+        }
+      }, 400);
+    });
+  }
+
   // Show the guard now, before the async storage/messaging below (which can
   // take long enough for the page's own paint to win the race and flash
   // first). Repainted or removed once real settings load.
@@ -980,6 +1018,7 @@
   // (not reassigned) once real values load, so these still see them.
   const settings = parseAndValidateSettings(DEFAULT_SETTINGS);
   setupTabStateMessages(settings);
+  setupVisibilityBackstop(settings);
 
   api.runtime.onMessage.addListener((message) => {
     if (message && message.type === MESSAGE_SET_PAGE_BRIGHTNESS) {
