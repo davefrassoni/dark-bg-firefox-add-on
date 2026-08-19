@@ -376,6 +376,21 @@
     return samples[Math.floor(samples.length / 2)] || canvasColor;
   }
 
+  // Painted as a <canvas> bitmap rather than a styled element: some browsers
+  // (e.g. Zen Browser's per-site "Boost" dark mode) recolor every resolved
+  // CSS style color in a tab at the rendering-engine level, which would hue-
+  // rotate a styled overlay's background-color into the opposite of the
+  // intended color. Canvas fillRect output is baked into pixels rather than
+  // resolved as a style color, so it isn't subject to that rewrite.
+  function paintOverlayColor(canvas, color) {
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return;
+    }
+    context.fillStyle = color;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
   function ensureTransitionOverlay(color) {
     const root = document.documentElement;
     if (!root) {
@@ -384,20 +399,27 @@
 
     let overlay = document.getElementById(OVERLAY_ID);
     if (!overlay) {
-      overlay = document.createElement("div");
+      overlay = document.createElement("canvas");
       overlay.id = OVERLAY_ID;
+      // A uniform fill looks identical at any backing-store size once the
+      // browser stretches it to the CSS box below, so there is no need to
+      // size this to the viewport or keep it in sync on resize.
+      overlay.width = 2;
+      overlay.height = 2;
       overlay.style.position = "fixed";
       overlay.style.inset = "0";
+      overlay.style.width = "100%";
+      overlay.style.height = "100%";
       overlay.style.pointerEvents = "none";
       overlay.style.zIndex = "2147483647";
       overlay.style.opacity = "1";
-      overlay.style.backgroundColor = color;
       overlay.style.transitionProperty = "opacity";
       overlay.style.transitionTimingFunction = "ease-out";
+      paintOverlayColor(overlay, color);
       root.appendChild(overlay);
     } else {
       overlay.style.opacity = "1";
-      overlay.style.backgroundColor = color;
+      paintOverlayColor(overlay, color);
     }
 
     return overlay;
@@ -422,7 +444,7 @@
       return;
     }
 
-    overlay.style.backgroundColor = color;
+    paintOverlayColor(overlay, color);
     overlay.style.transitionDuration = "0ms";
     overlay.style.transitionDelay = "0ms";
     overlay.style.opacity = "1";
