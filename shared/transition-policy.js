@@ -17,8 +17,7 @@
     return null;
   }
 
-  // A fade is useful only when the visible surface changes from dark (or an
-  // unknown, conservatively treated as dark surface) to a bright page.
+  // Fade only when going from dark (or unknown, treated as dark) to bright.
   function shouldFadeTransition(previousBrightness, nextBrightness) {
     return (
       normalizeBrightness(nextBrightness) === BRIGHTNESS_BRIGHT &&

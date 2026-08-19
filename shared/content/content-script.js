@@ -18,8 +18,8 @@
   const isAboutBlank =
     currentUrl === "about:blank" || currentUrl.startsWith("about:blank?");
 
-  // A top-level overlay already covers embedded documents. Running in frames can
-  // also bypass a site-list rule that correctly matched the top-level page.
+  // Top-level overlay already covers frames; running there could also skip
+  // a matched site-list rule.
   if (window.top !== window) {
     return;
   }
@@ -376,12 +376,9 @@
     return samples[Math.floor(samples.length / 2)] || canvasColor;
   }
 
-  // Painted as a <canvas> bitmap rather than a styled element: some browsers
-  // (e.g. Zen Browser's per-site "Boost" dark mode) recolor every resolved
-  // CSS style color in a tab at the rendering-engine level, which would hue-
-  // rotate a styled overlay's background-color into the opposite of the
-  // intended color. Canvas fillRect output is baked into pixels rather than
-  // resolved as a style color, so it isn't subject to that rewrite.
+  // Canvas, not a styled div: some browsers (e.g. Zen's "Boost" dark mode)
+  // recolor every CSS style color in a tab, which would hue-rotate a div's
+  // background-color. Canvas pixels aren't style colors, so they're immune.
   function paintOverlayColor(canvas, color) {
     const context = canvas.getContext("2d");
     if (!context) {
@@ -401,9 +398,8 @@
     if (!overlay) {
       overlay = document.createElement("canvas");
       overlay.id = OVERLAY_ID;
-      // A uniform fill looks identical at any backing-store size once the
-      // browser stretches it to the CSS box below, so there is no need to
-      // size this to the viewport or keep it in sync on resize.
+      // A solid fill looks the same at any size once stretched to the CSS
+      // box below, so no need to match the viewport or handle resize.
       overlay.width = 2;
       overlay.height = 2;
       overlay.style.position = "fixed";
@@ -449,8 +445,8 @@
     overlay.style.transitionDelay = "0ms";
     overlay.style.opacity = "1";
 
-    // Force style calculation before enabling the fade so repeated tab
-    // switches do not reuse the previous transition state.
+    // Forces a style recalc so repeated tab switches don't reuse the old
+    // transition state.
     void overlay.offsetHeight;
   }
 
@@ -614,8 +610,8 @@
 
     let original = originalBackgrounds.get(element);
     if (original) {
-      // An inline change that replaced our injected value belongs to the page
-      // and becomes the new value to restore when it is no longer bright.
+      // If the page overwrote our injected value, that's now the real value
+      // to restore later.
       if (!isInjectedBackground(element, original)) {
         original = {
           value: element.style.getPropertyValue("background-color"),
@@ -931,8 +927,8 @@
       }
 
       if (message.type === MESSAGE_SET_TAB_GUARD) {
-        // Guard messages target background tabs. Activation has its own message
-        // so a post-activation guard sync cannot cancel an in-progress fade.
+        // Guard messages are for background tabs only -- activation has its
+        // own message, so this can't cancel an in-progress fade.
         if (document.visibilityState !== "hidden") {
           return false;
         }
@@ -973,26 +969,15 @@
     });
   }
 
-  // Show a guard immediately, before any of the async storage/messaging
-  // below. Waiting on those first (a sync-storage read, a local-storage
-  // read, and a round-trip to the background service worker, which may
-  // need a cold start) let the browser's own paint occasionally win that
-  // race and flash the real page before the guard ever appeared. The
-  // default color is a safe guess for the common case (a fresh navigation
-  // with no known-bright previous state); it gets repainted or removed
-  // below once the real settings and brightness state are known.
+  // Show the guard now, before the async storage/messaging below (which can
+  // take long enough for the page's own paint to win the race and flash
+  // first). Repainted or removed once real settings load.
   showGuardOverlay(DEFAULT_SETTINGS.preloadColor);
 
-  // Register every runtime.onMessage listener synchronously too, before any
-  // of the async storage/messaging below. WebExtension messaging does not
-  // queue an unheard message for a listener that registers later -- it is
-  // simply dropped. Registering only after the awaits left a real window
-  // where a genuine tab activation (or a background-tab guard message)
-  // could arrive before this content script was listening, leaving the
-  // guard stuck solid ("black screen") or never armed at all (a bright page
-  // shows with no fade). settings starts as parsed defaults and is mutated
-  // in place (not reassigned) once the real settings load, so this early
-  // listener always sees the current values on every later invocation.
+  // Listeners register synchronously too: an unheard message is dropped, not
+  // queued, so registering after the awaits could miss a tab-activation or
+  // guard message and leave the overlay stuck. settings is mutated in place
+  // (not reassigned) once real values load, so these still see them.
   const settings = parseAndValidateSettings(DEFAULT_SETTINGS);
   setupTabStateMessages(settings);
 
@@ -1011,9 +996,8 @@
 
   Object.assign(settings, parseAndValidateSettings(rawSettings));
 
-  // The manual per-page brightness dimmer is independent of the anti-flash
-  // guard settings above, so it applies even on pages excluded by the site
-  // list or with the guard turned off entirely.
+  // Independent of the guard settings above -- applies even if the guard is
+  // disabled or this site is excluded.
   const storedPageBrightness = await storageGetLocal({
     [PAGE_BRIGHTNESS_STORAGE_KEY]: {}
   });
