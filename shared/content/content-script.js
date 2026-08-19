@@ -198,9 +198,15 @@
     return settings.applyOnAllPages && shouldRunOnCurrentPage(settings);
   }
 
-  async function sendRuntimeMessage(message) {
+  // A slow-to-wake background page (e.g. a suspended Firefox event page)
+  // could otherwise leave this unsettled forever, blocking every await on
+  // it -- including the one that decides whether the guard fades or clears.
+  async function sendRuntimeMessage(message, timeoutMs = 350) {
     try {
-      return await api.runtime.sendMessage(message);
+      return await Promise.race([
+        api.runtime.sendMessage(message),
+        new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs))
+      ]);
     } catch (error) {
       return null;
     }
