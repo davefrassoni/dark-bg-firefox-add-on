@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Dark Background Anti-Flash"
+  },
+  "extDescription": {
+    "message": "Уменьшает яркие вспышки на светлых страницах с помощью временного тёмного слоя, который плавно исчезает."
+  },
+  "menuOpenOptions": {
+    "message": "Открыть параметры"
+  },
+  "cmdToggleGuard": {
+    "message": "Включить или выключить защиту"
+  },
+  "cmdToggleSite": {
+    "message": "Приостановить или возобновить на текущем сайте"
+  },
+  "cmdBrightnessUp": {
+    "message": "Сделать текущий сайт светлее"
+  },
+  "cmdBrightnessDown": {
+    "message": "Сделать текущий сайт темнее"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Dark Background Anti-Flash"
+  },
+  "extDescription": {
+    "message": "Reduces bright flashes on bright pages using a temporary dark overlay that fades out smoothly."
+  },
+  "menuOpenOptions": {
+    "message": "Open options"
+  },
+  "cmdToggleGuard": {
+    "message": "Turn the fade guard on or off"
+  },
+  "cmdToggleSite": {
+    "message": "Pause or resume on the current site"
+  },
+  "cmdBrightnessUp": {
+    "message": "Brighten the current site"
+  },
+  "cmdBrightnessDown": {
+    "message": "Dim the current site"
+  }
+}

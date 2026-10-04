@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Dark Background Anti-Flash"
+  },
+  "extDescription": {
+    "message": "يقلل الومضات الساطعة في الصفحات الفاتحة بطبقة داكنة مؤقتة تتلاشى بسلاسة."
+  },
+  "menuOpenOptions": {
+    "message": "فتح الخيارات"
+  },
+  "cmdToggleGuard": {
+    "message": "تشغيل الحماية أو إيقافها"
+  },
+  "cmdToggleSite": {
+    "message": "إيقاف مؤقت أو استئناف على الموقع الحالي"
+  },
+  "cmdBrightnessUp": {
+    "message": "زيادة سطوع الموقع الحالي"
+  },
+  "cmdBrightnessDown": {
+    "message": "تعتيم الموقع الحالي"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Dark Background Anti-Flash"
+  },
+  "extDescription": {
+    "message": "Reduz clarões em páginas claras com uma camada escura temporária que desaparece suavemente."
+  },
+  "menuOpenOptions": {
+    "message": "Abrir opções"
+  },
+  "cmdToggleGuard": {
+    "message": "Ativar ou desativar a proteção"
+  },
+  "cmdToggleSite": {
+    "message": "Pausar ou retomar no site atual"
+  },
+  "cmdBrightnessUp": {
+    "message": "Clarear o site atual"
+  },
+  "cmdBrightnessDown": {
+    "message": "Escurecer o site atual"
+  }
+}

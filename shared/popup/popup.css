@@ -175,3 +175,22 @@ input[type="range"] {
 #status.error {
   color: var(--danger);
 }
+
+#site-state {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#site-toggle {
+  flex: none;
+}
+
+button:disabled,
+input:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+[hidden] {
+  display: none !important;
+}

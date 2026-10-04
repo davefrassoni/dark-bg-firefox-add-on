@@ -1,12 +1,26 @@
 (async () => {
   const api = typeof browser !== "undefined" ? browser : chrome;
-  const OVERLAY_ID = "dark-background-anti-flash-overlay";
-  const MESSAGE_DOCUMENT_INIT = "dark-anti-flash:document-init";
-  const MESSAGE_BRIGHTNESS_REPORT = "dark-anti-flash:brightness-report";
-  const MESSAGE_SET_TAB_GUARD = "dark-anti-flash:set-tab-guard";
-  const MESSAGE_TAB_ACTIVATED = "dark-anti-flash:tab-activated";
-  const MESSAGE_SET_PAGE_BRIGHTNESS = "dark-anti-flash:set-page-brightness";
-  const PAGE_BRIGHTNESS_STORAGE_KEY = "darkAntiFlashPageBrightness";
+  const {
+    MESSAGES,
+    OVERLAY_ID,
+    PAGE_BRIGHTNESS_STORAGE_KEY,
+    PAGE_BRIGHTNESS,
+    NAVIGATION_HINT_KEY,
+    NAVIGATION_HINT_MAX_AGE_MS,
+    clamp,
+    compileSettings,
+    isActiveOnLocation
+  } = globalThis.DarkAntiFlashSettings;
+  const {
+    parseRgbString,
+    brightnessOf,
+    compositeColors,
+    averageColors,
+    rgbToHex,
+    hexToRgb,
+    createMemo,
+    TRANSPARENT
+  } = globalThis.DarkAntiFlashColor;
   const {
     BRIGHTNESS_BRIGHT,
     BRIGHTNESS_DARK,
@@ -29,53 +43,25 @@
     return;
   }
 
-  const DEFAULT_SETTINGS = {
-    applyOnAllPages: true,
-    preloadColor: "#0b0d10",
-    transitionDurationMs: 1800,
-    initialHoldMs: 220,
-    tabSwitchTransitionEnabled: true,
-    tabSwitchTransitionDurationMs: 1800,
-    tabSwitchInitialHoldMs: 220,
-    brightnessThreshold: 185,
-    darkenBrightBackgroundsEnabled: false,
-    darkBackgroundColor: "#121417",
-    backgroundBrightnessThreshold: 210,
-    siteListMode: "blacklist",
-    siteListHosts: "",
-    excludedHosts: ""
-  };
-
   const CLEANUP_BUFFER_MS = 120;
+  const BRIGHTNESS_REPORT_THROTTLE_MS = 400;
+  const prefersDarkQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
-  function storageGet(defaults) {
+  // Read before this page overwrites it on pagehide.
+  const navigationHint = readNavigationHint();
+
+  function readNavigationHint() {
     try {
-      const result = api.storage.sync.get(defaults);
-      if (result && typeof result.then === "function") {
-        return result;
+      const hint = JSON.parse(
+        window.sessionStorage.getItem(NAVIGATION_HINT_KEY) || "null"
+      );
+      if (hint && Date.now() - hint.time < NAVIGATION_HINT_MAX_AGE_MS) {
+        return hint;
       }
     } catch (error) {
-      // Fall back to callback style.
+      // Opaque origins have no sessionStorage.
     }
-
-    return new Promise((resolve) => {
-      api.storage.sync.get(defaults, (value) => resolve(value));
-    });
-  }
-
-  function storageGetLocal(defaults) {
-    try {
-      const result = api.storage.local.get(defaults);
-      if (result && typeof result.then === "function") {
-        return result;
-      }
-    } catch (error) {
-      // Fall back to callback style.
-    }
-
-    return new Promise((resolve) => {
-      api.storage.local.get(defaults, (value) => resolve(value));
-    });
+    return null;
   }
 
   function applyPageBrightness(value) {
@@ -83,119 +69,27 @@
     if (!root) {
       return;
     }
-    const clamped = clamp(value, 30, 150, 100);
-    if (clamped === 100) {
+    const clamped = clamp(
+      value,
+      PAGE_BRIGHTNESS.min,
+      PAGE_BRIGHTNESS.max,
+      PAGE_BRIGHTNESS.default
+    );
+    if (clamped === PAGE_BRIGHTNESS.default) {
       root.style.removeProperty("filter");
     } else {
       root.style.setProperty("filter", `brightness(${clamped}%)`);
     }
   }
 
-  function clamp(value, min, max, fallback) {
-    const num = Number(value);
-    if (!Number.isFinite(num)) {
-      return fallback;
-    }
-    return Math.min(max, Math.max(min, num));
-  }
-
-  function normalizeHexColor(value, fallback) {
-    if (typeof value !== "string") {
-      return fallback;
-    }
-    const normalized = value.trim().toLowerCase();
-    const hexPattern = /^#([0-9a-f]{3}|[0-9a-f]{6})$/;
-    if (!hexPattern.test(normalized)) {
-      return fallback;
-    }
-    if (normalized.length === 4) {
-      return (
-        "#" +
-        normalized[1] +
-        normalized[1] +
-        normalized[2] +
-        normalized[2] +
-        normalized[3] +
-        normalized[3]
-      );
-    }
-    return normalized;
-  }
-
-  function parseSiteRules(raw) {
-    if (typeof raw !== "string" || raw.trim() === "") {
-      return [];
-    }
-
-    return raw
-      .split(/\r?\n/g)
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-      .map((entry) => {
-        const normalizedEntry = entry
-          .replace(/^\/\//, "")
-          .replace(/\/\*$/, "");
-        const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(entry)
-          ? normalizedEntry
-          : `https://${normalizedEntry}`;
-
-        try {
-          const parsed = new URL(withScheme);
-          const entryHasPath = normalizedEntry
-            .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
-            .includes("/");
-          const pathPrefix =
-            entryHasPath && parsed.pathname !== "/"
-              ? parsed.pathname.replace(/\/+$/, "")
-              : "";
-
-          return {
-            hostname: parsed.hostname.toLowerCase().replace(/^\*\./, ""),
-            pathPrefix
-          };
-        } catch (error) {
-          return null;
-        }
-      })
-      .filter((rule) => rule && rule.hostname);
-  }
-
-  function isHostnameMatch(hostname, ruleHostname) {
-    return hostname === ruleHostname || hostname.endsWith("." + ruleHostname);
-  }
-
-  function isPathMatch(pathname, pathPrefix) {
-    if (!pathPrefix) {
-      return true;
-    }
-    return pathname === pathPrefix || pathname.startsWith(pathPrefix + "/");
-  }
-
-  function isCurrentPageIn(siteRules) {
-    const hostname = window.location.hostname.toLowerCase();
-    const pathname = window.location.pathname || "/";
-
-    return siteRules.some(
-      (rule) =>
-        isHostnameMatch(hostname, rule.hostname) &&
-        isPathMatch(pathname, rule.pathPrefix)
-    );
-  }
-
-  function normalizeSiteListMode(value) {
-    return value === "whitelist" ? "whitelist" : "blacklist";
-  }
-
-  function shouldRunOnCurrentPage(settings) {
-    const isListed = isCurrentPageIn(settings.siteListRules);
-    if (settings.siteListMode === "whitelist") {
-      return isListed;
-    }
-    return !isListed;
-  }
-
   function isEnabledOnCurrentPage(settings) {
-    return settings.applyOnAllPages && shouldRunOnCurrentPage(settings);
+    return isActiveOnLocation(
+      settings,
+      window.location.hostname,
+      window.location.pathname,
+      new Date(),
+      prefersDarkQuery.matches
+    );
   }
 
   // A slow-to-wake background page (e.g. a suspended Firefox event page)
@@ -212,34 +106,15 @@
     }
   }
 
-  function parseRgbString(rgbValue) {
-    if (typeof rgbValue !== "string") {
-      return null;
-    }
-
-    const normalized = rgbValue.trim().replace(/\s*\/\s*/, ",");
-    const match = normalized.match(
-      /^rgba?\(\s*([\d.]+)(?:\s*,\s*|\s+)([\d.]+)(?:\s*,\s*|\s+)([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i
-    );
-    if (!match) {
-      return null;
-    }
-    return {
-      r: clamp(Number(match[1]), 0, 255, 0),
-      g: clamp(Number(match[2]), 0, 255, 0),
-      b: clamp(Number(match[3]), 0, 255, 0),
-      a: match[4] === undefined ? 1 : clamp(Number(match[4]), 0, 1, 1)
-    };
-  }
-
   let colorCanvasContext = null;
 
-  function parseCssColor(colorValue) {
+  // Modern color syntaxes (oklch(), color()) stay unresolved in computed
+  // styles; a 1px canvas converts them. Memoized: pages reuse few colors.
+  const parseCssColor = createMemo(256, (colorValue) => {
     const direct = parseRgbString(colorValue);
     if (direct) {
       return direct;
     }
-
     if (
       typeof colorValue !== "string" ||
       (globalThis.CSS &&
@@ -248,89 +123,39 @@
     ) {
       return null;
     }
-
     if (!colorCanvasContext) {
       const canvas = document.createElement("canvas");
       canvas.width = 1;
       canvas.height = 1;
       colorCanvasContext = canvas.getContext("2d", { willReadFrequently: true });
     }
-
     if (!colorCanvasContext) {
       return null;
     }
-
     colorCanvasContext.clearRect(0, 0, 1, 1);
     colorCanvasContext.fillStyle = colorValue;
     colorCanvasContext.fillRect(0, 0, 1, 1);
     const [r, g, b, alpha] = colorCanvasContext.getImageData(0, 0, 1, 1).data;
     return { r, g, b, a: alpha / 255 };
-  }
-
-  function brightnessOf(color) {
-    return 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
-  }
-
-  function compositeColors(foreground, background) {
-    const alpha = foreground.a + background.a * (1 - foreground.a);
-    if (alpha <= 0) {
-      return { r: 0, g: 0, b: 0, a: 0 };
-    }
-
-    return {
-      r:
-        (foreground.r * foreground.a +
-          background.r * background.a * (1 - foreground.a)) /
-        alpha,
-      g:
-        (foreground.g * foreground.a +
-          background.g * background.a * (1 - foreground.a)) /
-        alpha,
-      b:
-        (foreground.b * foreground.a +
-          background.b * background.a * (1 - foreground.a)) /
-        alpha,
-      a: alpha
-    };
-  }
+  });
 
   function renderedBackgroundColorFor(element) {
     const style = getComputedStyle(element);
-    const solidColor = parseCssColor(style.backgroundColor) || {
-      r: 0,
-      g: 0,
-      b: 0,
-      a: 0
-    };
+    const solidColor = parseCssColor(style.backgroundColor) || TRANSPARENT;
     const backgroundImage = style.backgroundImage || "";
     if (!backgroundImage.includes("gradient(")) {
       return solidColor;
     }
 
-    const colorTokens = backgroundImage.match(/rgba?\([^)]*\)/gi) || [];
-    const gradientColors = colorTokens
+    const gradientColors = (backgroundImage.match(/rgba?\([^)]*\)/gi) || [])
       .map((color) => parseCssColor(color))
       .filter(Boolean);
-    if (gradientColors.length === 0) {
-      return solidColor;
-    }
-
-    const average = gradientColors.reduce(
-      (result, color) => ({
-        r: result.r + color.r / gradientColors.length,
-        g: result.g + color.g / gradientColors.length,
-        b: result.b + color.b / gradientColors.length,
-        a: result.a + color.a / gradientColors.length
-      }),
-      { r: 0, g: 0, b: 0, a: 0 }
-    );
-    return compositeColors(average, solidColor);
+    const average = averageColors(gradientColors);
+    return average ? compositeColors(average, solidColor) : solidColor;
   }
 
   function detectBrowserCanvasColor() {
-    const root = document.documentElement;
-    const rootStyle = getComputedStyle(root);
-    const colorSchemes = (rootStyle.colorScheme || "")
+    const colorSchemes = (getComputedStyle(document.documentElement).colorScheme || "")
       .toLowerCase()
       .split(/\s+/)
       .filter((value) => value && value !== "only" && value !== "normal");
@@ -338,7 +163,6 @@
     if (colorSchemes[0] === "dark") {
       return { r: 18, g: 18, b: 18, a: 1 };
     }
-
     return { r: 255, g: 255, b: 255, a: 1 };
   }
 
@@ -358,7 +182,6 @@
         result = compositeColors(background, result);
       }
     }
-
     return result;
   }
 
@@ -366,17 +189,12 @@
     const canvasColor = detectBrowserCanvasColor();
     const width = Math.max(1, document.documentElement.clientWidth || innerWidth);
     const height = Math.max(1, document.documentElement.clientHeight || innerHeight);
-    const horizontalSamples = [0.2, 0.5, 0.8].map((ratio) =>
-      Math.min(width - 1, Math.max(0, Math.floor(width * ratio)))
-    );
-    const verticalSamples = [0.2, 0.5, 0.8].map((ratio) =>
-      Math.min(height - 1, Math.max(0, Math.floor(height * ratio)))
-    );
-    const points = horizontalSamples.flatMap((x) =>
-      verticalSamples.map((y) => [x, y])
-    );
-    const samples = points
-      .map(([x, y]) => sampleRenderedBackgroundAt(x, y, canvasColor))
+    const toPixels = (size) => (ratio) =>
+      Math.min(size - 1, Math.max(0, Math.floor(size * ratio)));
+    const xs = [0.2, 0.5, 0.8].map(toPixels(width));
+    const ys = [0.2, 0.5, 0.8].map(toPixels(height));
+    const samples = xs
+      .flatMap((x) => ys.map((y) => sampleRenderedBackgroundAt(x, y, canvasColor)))
       .sort((left, right) => brightnessOf(left) - brightnessOf(right));
 
     return samples[Math.floor(samples.length / 2)] || canvasColor;
@@ -427,7 +245,14 @@
     return overlay;
   }
 
+  function isOverlayVisible() {
+    const overlay = document.getElementById(OVERLAY_ID);
+    return Boolean(overlay && overlay.style.opacity !== "0");
+  }
+
   let overlayGeneration = 0;
+  // Called once a fade has finished and the overlay is gone.
+  let onOverlaySettled = null;
 
   function removeTransitionOverlay() {
     overlayGeneration += 1;
@@ -435,10 +260,6 @@
     if (existing && existing.parentNode) {
       existing.parentNode.removeChild(existing);
     }
-  }
-
-  function getCleanupDelay(transitionDurationMs, initialHoldMs) {
-    return transitionDurationMs + initialHoldMs + CLEANUP_BUFFER_MS;
   }
 
   function setOverlayVisibleImmediately(overlay, color) {
@@ -456,12 +277,7 @@
     void overlay.offsetHeight;
   }
 
-  function fadeOverlayOut(
-    overlay,
-    transitionDurationMs,
-    initialHoldMs,
-    generation
-  ) {
+  function fadeOverlayOut(overlay, transitionDurationMs, initialHoldMs, generation) {
     if (!overlay) {
       return;
     }
@@ -477,368 +293,27 @@
     });
   }
 
-  function parseAndValidateSettings(rawSettings) {
-    const siteListHosts =
-      rawSettings.siteListHosts === undefined
-        ? rawSettings.excludedHosts
-        : rawSettings.siteListHosts;
-
-    return {
-      applyOnAllPages: Boolean(rawSettings.applyOnAllPages),
-      preloadColor: normalizeHexColor(
-        rawSettings.preloadColor,
-        DEFAULT_SETTINGS.preloadColor
-      ),
-      transitionDurationMs: clamp(
-        rawSettings.transitionDurationMs,
-        0,
-        10000,
-        DEFAULT_SETTINGS.transitionDurationMs
-      ),
-      initialHoldMs: clamp(
-        rawSettings.initialHoldMs,
-        0,
-        5000,
-        DEFAULT_SETTINGS.initialHoldMs
-      ),
-      tabSwitchTransitionEnabled: Boolean(rawSettings.tabSwitchTransitionEnabled),
-      tabSwitchTransitionDurationMs: clamp(
-        rawSettings.tabSwitchTransitionDurationMs,
-        0,
-        10000,
-        DEFAULT_SETTINGS.tabSwitchTransitionDurationMs
-      ),
-      tabSwitchInitialHoldMs: clamp(
-        rawSettings.tabSwitchInitialHoldMs,
-        0,
-        5000,
-        DEFAULT_SETTINGS.tabSwitchInitialHoldMs
-      ),
-      brightnessThreshold: clamp(
-        rawSettings.brightnessThreshold,
-        0,
-        255,
-        DEFAULT_SETTINGS.brightnessThreshold
-      ),
-      darkenBrightBackgroundsEnabled: Boolean(
-        rawSettings.darkenBrightBackgroundsEnabled
-      ),
-      darkBackgroundColor: normalizeHexColor(
-        rawSettings.darkBackgroundColor,
-        DEFAULT_SETTINGS.darkBackgroundColor
-      ),
-      backgroundBrightnessThreshold: clamp(
-        rawSettings.backgroundBrightnessThreshold,
-        0,
-        255,
-        DEFAULT_SETTINGS.backgroundBrightnessThreshold
-      ),
-      siteListMode: normalizeSiteListMode(rawSettings.siteListMode),
-      siteListRules: parseSiteRules(siteListHosts)
-    };
-  }
-
-  function cleanupAfterTransition(overlay) {
-    if (overlay && overlay.parentNode && overlay.style.opacity !== "1") {
-      overlay.parentNode.removeChild(overlay);
-    }
-  }
-
-  function isBrightPage(settings) {
-    return (
-      brightnessOf(detectPageBackgroundRgba()) >= settings.brightnessThreshold
-    );
-  }
-
-  function detectPageBrightness(settings) {
-    return isBrightPage(settings) ? BRIGHTNESS_BRIGHT : BRIGHTNESS_DARK;
-  }
-
-  function isBrightBackground(element, settings) {
-    if (!(element instanceof Element) || element.id === OVERLAY_ID) {
-      return false;
-    }
-
-    const color = parseCssColor(getComputedStyle(element).backgroundColor);
-    return (
-      color &&
-      color.a > 0.05 &&
-      brightnessOf(color) >= settings.backgroundBrightnessThreshold
-    );
-  }
-
-  function setDarkBackground(element, settings, originalBackgrounds) {
-    if (!originalBackgrounds.has(element)) {
-      originalBackgrounds.set(element, {
-        value: element.style.getPropertyValue("background-color"),
-        priority: element.style.getPropertyPriority("background-color")
-      });
-    }
-
-    element.style.setProperty(
-      "background-color",
-      settings.darkBackgroundColor,
-      "important"
-    );
-
-    const original = originalBackgrounds.get(element);
-    original.injectedValue = element.style.getPropertyValue("background-color");
-    original.injectedPriority = element.style.getPropertyPriority(
-      "background-color"
-    );
-  }
-
-  function restoreOriginalBackground(element, original) {
-    if (original.value) {
-      element.style.setProperty(
-        "background-color",
-        original.value,
-        original.priority
-      );
-    } else {
-      element.style.removeProperty("background-color");
-    }
-  }
-
-  function isInjectedBackground(element, original) {
-    return (
-      element.style.getPropertyValue("background-color") ===
-        original.injectedValue &&
-      element.style.getPropertyPriority("background-color") ===
-        original.injectedPriority
-    );
-  }
-
-  function reevaluateBrightBackground(element, settings, originalBackgrounds) {
-    if (!(element instanceof Element) || element.id === OVERLAY_ID) {
-      return;
-    }
-
-    let original = originalBackgrounds.get(element);
-    if (original) {
-      // If the page overwrote our injected value, that's now the real value
-      // to restore later.
-      if (!isInjectedBackground(element, original)) {
-        original = {
-          value: element.style.getPropertyValue("background-color"),
-          priority: element.style.getPropertyPriority("background-color")
-        };
-        originalBackgrounds.set(element, original);
-      }
-      restoreOriginalBackground(element, original);
-    }
-
-    if (isBrightBackground(element, settings)) {
-      setDarkBackground(element, settings, originalBackgrounds);
-    } else if (original) {
-      originalBackgrounds.delete(element);
-    }
-  }
-
-  function overrideBrightPageCanvas(settings, originalBackgrounds) {
-    const canvas = document.documentElement;
-    let original = originalBackgrounds.get(canvas);
-    if (original) {
-      if (!isInjectedBackground(canvas, original)) {
-        original = {
-          value: canvas.style.getPropertyValue("background-color"),
-          priority: canvas.style.getPropertyPriority("background-color")
-        };
-        originalBackgrounds.set(canvas, original);
-      }
-      restoreOriginalBackground(canvas, original);
-    }
-
-    const pageColor = detectPageBackgroundRgba();
-    if (
-      pageColor &&
-      brightnessOf(pageColor) >= settings.backgroundBrightnessThreshold
-    ) {
-      setDarkBackground(canvas, settings, originalBackgrounds);
-    } else if (original) {
-      originalBackgrounds.delete(canvas);
-    }
-  }
-
-  function overrideBrightBackgroundsIn(root, settings, originalBackgrounds) {
-    if (root === document) {
-      overrideBrightPageCanvas(settings, originalBackgrounds);
-    }
-
-    if (root instanceof Element) {
-      reevaluateBrightBackground(root, settings, originalBackgrounds);
-    }
-
-    if (root && typeof root.querySelectorAll === "function") {
-      root.querySelectorAll("*").forEach((element) => {
-        if (root === document && element === document.documentElement) {
-          return;
-        }
-        reevaluateBrightBackground(element, settings, originalBackgrounds);
-      });
-    }
-  }
-
-  function setupBrightBackgroundOverrides(settings) {
-    const originalBackgrounds = new Map();
-    let observer;
-    let stopped = false;
-    let fullScanFrame = null;
-
-    const startObserving = () => {
-      if (stopped) {
-        return;
-      }
-      observer.observe(document.documentElement, {
-        subtree: true,
-        childList: true,
-        attributes: true,
-        attributeFilter: ["class", "style"]
-      });
-    };
-
-    overrideBrightBackgroundsIn(document, settings, originalBackgrounds);
-
-    let fullScanScheduled = false;
-    const scheduleFullScan = () => {
-      if (stopped || fullScanScheduled) {
-        return;
-      }
-      fullScanScheduled = true;
-      fullScanFrame = requestAnimationFrame(() => {
-        fullScanFrame = null;
-        fullScanScheduled = false;
-        if (stopped) {
-          return;
-        }
-        if (
-          settings.darkenBrightBackgroundsEnabled &&
-          isEnabledOnCurrentPage(settings)
-        ) {
-          observer.disconnect();
-          overrideBrightBackgroundsIn(
-            document,
-            settings,
-            originalBackgrounds
-          );
-          startObserving();
-        }
-      });
-    };
-
-    observer = new MutationObserver((mutations) => {
-      let stylesheetChanged = false;
-      observer.disconnect();
-
-      for (const mutation of mutations) {
-        if (mutation.type === "attributes") {
-          overrideBrightBackgroundsIn(
-            mutation.target,
-            settings,
-            originalBackgrounds
-          );
-          if (
-            mutation.target === document.documentElement ||
-            mutation.target === document.body
-          ) {
-            stylesheetChanged = true;
-          }
-          continue;
-        }
-
-        if (
-          mutation.target instanceof Element &&
-          mutation.target.closest("style")
-        ) {
-          stylesheetChanged = true;
-        }
-
-        for (const addedNode of mutation.addedNodes) {
-          if (!(addedNode instanceof Element)) {
-            continue;
-          }
-          if (addedNode.matches("style, link[rel~='stylesheet']")) {
-            stylesheetChanged = true;
-            if (addedNode instanceof HTMLLinkElement) {
-              addedNode.addEventListener("load", scheduleFullScan, { once: true });
-            }
-          }
-          overrideBrightBackgroundsIn(
-            addedNode,
-            settings,
-            originalBackgrounds
-          );
-        }
-      }
-
-      startObserving();
-
-      if (stylesheetChanged) {
-        scheduleFullScan();
-      }
-    });
-
-    startObserving();
-    const colorSchemeQuery = matchMedia("(prefers-color-scheme: dark)");
-    const handleEnvironmentChange = () => scheduleFullScan();
-    window.addEventListener("resize", handleEnvironmentChange, {
-      passive: true
-    });
-    if (typeof colorSchemeQuery.addEventListener === "function") {
-      colorSchemeQuery.addEventListener("change", handleEnvironmentChange);
-    } else if (typeof colorSchemeQuery.addListener === "function") {
-      colorSchemeQuery.addListener(handleEnvironmentChange);
-    }
-
-    return {
-      stop() {
-        stopped = true;
-        if (fullScanFrame !== null) {
-          cancelAnimationFrame(fullScanFrame);
-          fullScanFrame = null;
-          fullScanScheduled = false;
-        }
-        observer.disconnect();
-        window.removeEventListener("resize", handleEnvironmentChange);
-        if (typeof colorSchemeQuery.removeEventListener === "function") {
-          colorSchemeQuery.removeEventListener(
-            "change",
-            handleEnvironmentChange
-          );
-        } else if (typeof colorSchemeQuery.removeListener === "function") {
-          colorSchemeQuery.removeListener(handleEnvironmentChange);
-        }
-        originalBackgrounds.forEach((original, element) => {
-          if (!element.isConnected) {
-            return;
-          }
-          restoreOriginalBackground(element, original);
-        });
-        originalBackgrounds.clear();
-      }
-    };
-  }
-
-  function playOverlayTransition(preloadColor, transitionDurationMs, initialHoldMs) {
+  function playOverlayTransition(color, transitionDurationMs, initialHoldMs) {
     const generation = ++overlayGeneration;
-    const overlay = ensureTransitionOverlay(preloadColor);
+    const overlay = ensureTransitionOverlay(color);
     if (!overlay) {
       return;
     }
 
-    setOverlayVisibleImmediately(overlay, preloadColor);
-    fadeOverlayOut(
-      overlay,
-      transitionDurationMs,
-      initialHoldMs,
-      generation
-    );
+    setOverlayVisibleImmediately(overlay, color);
+    fadeOverlayOut(overlay, transitionDurationMs, initialHoldMs, generation);
 
     setTimeout(() => {
-      if (generation === overlayGeneration) {
-        cleanupAfterTransition(overlay);
+      if (generation !== overlayGeneration) {
+        return;
       }
-    }, getCleanupDelay(transitionDurationMs, initialHoldMs));
+      if (overlay.parentNode && overlay.style.opacity !== "1") {
+        overlay.parentNode.removeChild(overlay);
+      }
+      if (onOverlaySettled) {
+        onOverlaySettled();
+      }
+    }, transitionDurationMs + initialHoldMs + CLEANUP_BUFFER_MS);
   }
 
   function showGuardOverlay(color) {
@@ -848,82 +323,445 @@
     return overlay;
   }
 
-  let currentPageBrightness = null;
-  let brightnessReportTimer = null;
+  // The guard fades from the previous page's own background when that was
+  // dark, so the hand-off is seamless; otherwise from the configured color.
+  function chooseGuardColor(settings, previousColor) {
+    if (settings.matchPreviousColor) {
+      const rgb = hexToRgb(previousColor);
+      if (rgb && brightnessOf(rgb) < settings.brightnessThreshold) {
+        return previousColor;
+      }
+    }
+    return settings.preloadColor;
+  }
+
+  // ---- Brightness detection and reporting ----
+
+  let lastMeasurement = null;
+  let lastReported = { brightness: null, color: null };
+
+  function measurePage(settings) {
+    const rgba = detectPageBackgroundRgba();
+    lastMeasurement = {
+      brightness:
+        brightnessOf(rgba) >= settings.brightnessThreshold
+          ? BRIGHTNESS_BRIGHT
+          : BRIGHTNESS_DARK,
+      color: rgbToHex(rgba)
+    };
+    return lastMeasurement;
+  }
+
+  function sendBrightnessReport(force = false) {
+    const measurement = lastMeasurement;
+    if (!measurement) {
+      return;
+    }
+    if (
+      !force &&
+      measurement.brightness === lastReported.brightness &&
+      measurement.color === lastReported.color
+    ) {
+      return;
+    }
+    lastReported = measurement;
+    void sendRuntimeMessage({
+      type: MESSAGES.BRIGHTNESS_REPORT,
+      brightness: measurement.brightness,
+      color: measurement.color,
+      overlayVisible: isOverlayVisible()
+    });
+  }
 
   function reportCurrentBrightness(settings, force = false) {
-    const brightness = detectPageBrightness(settings);
-    if (!force && brightness === currentPageBrightness) {
-      return brightness;
-    }
-
-    currentPageBrightness = brightness;
-    void sendRuntimeMessage({
-      type: MESSAGE_BRIGHTNESS_REPORT,
-      brightness
-    });
+    const { brightness } = measurePage(settings);
+    sendBrightnessReport(force);
     return brightness;
   }
 
+  let brightnessReportTimer = null;
+
+  // Trailing throttle, run when the browser is idle: page mutations can
+  // arrive many times a second and each measurement forces style and layout.
   function scheduleBrightnessReport(settings) {
-    if (brightnessReportTimer !== null) {
+    if (brightnessReportTimer !== null || document.visibilityState === "hidden") {
       return;
     }
     brightnessReportTimer = setTimeout(() => {
-      brightnessReportTimer = null;
-      reportCurrentBrightness(settings);
-    }, 120);
+      const run = () => {
+        brightnessReportTimer = null;
+        if (document.visibilityState !== "hidden") {
+          reportCurrentBrightness(settings);
+        }
+      };
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(run, { timeout: 300 });
+      } else {
+        run();
+      }
+    }, BRIGHTNESS_REPORT_THROTTLE_MS);
   }
 
   function setupBrightnessMonitoring(settings) {
-    const observer = new MutationObserver(() => {
-      scheduleBrightnessReport(settings);
+    const observer = new MutationObserver(() => scheduleBrightnessReport(settings));
+    const observe = () =>
+      observer.observe(document.documentElement, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ["class", "style"]
+      });
+    observe();
+
+    // Hidden tabs don't watch the page at all; they report their final
+    // state as they're left and are re-measured on activation.
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        observer.disconnect();
+        reportCurrentBrightness(settings);
+      } else {
+        observe();
+        scheduleBrightnessReport(settings);
+      }
     });
+
+    window.addEventListener("resize", () => scheduleBrightnessReport(settings), {
+      passive: true
+    });
+    prefersDarkQuery.addEventListener("change", () => scheduleBrightnessReport(settings));
+  }
+
+  // Leaves a hint for the next page of this site in this tab (see
+  // early-guard.js), so a bright-to-bright navigation skips the guard.
+  function setupNavigationHint(settings) {
+    window.addEventListener("pagehide", () => {
+      if (!isEnabledOnCurrentPage(settings)) {
+        return;
+      }
+      const { brightness, color } = measurePage(settings);
+      try {
+        window.sessionStorage.setItem(
+          NAVIGATION_HINT_KEY,
+          JSON.stringify({
+            brightness,
+            guardColor: chooseGuardColor(settings, color),
+            time: Date.now()
+          })
+        );
+      } catch (error) {
+        // Storage can be full or unavailable; the hint is only an optimization.
+      }
+    });
+  }
+
+  // ---- Replacing bright CSS backgrounds ----
+  // Work is queued and done in small per-frame batches: all style reads of a
+  // batch first, then all writes, so the browser recalculates styles once per
+  // batch instead of once per element.
+
+  function isInjectedBackground(element, original) {
+    return (
+      element.style.getPropertyValue("background-color") === original.injectedValue &&
+      element.style.getPropertyPriority("background-color") === original.injectedPriority
+    );
+  }
+
+  function restoreOriginalBackground(element, original) {
+    if (original.value) {
+      element.style.setProperty("background-color", original.value, original.priority);
+    } else {
+      element.style.removeProperty("background-color");
+    }
+  }
+
+  function setupBrightBackgroundOverrides(settings) {
+    const FRAME_BUDGET_MS = 6;
+    const originalBackgrounds = new Map();
+    const forcedElements = new Set();
+    const pendingRoots = [];
+    let activeWalker = null;
+    let canvasDirty = true;
+    let frame = null;
+    let stopped = false;
+
+    const isBrightColor = (color) =>
+      Boolean(
+        color &&
+          color.a > 0.05 &&
+          brightnessOf(color) >= settings.backgroundBrightnessThreshold
+      );
+
+    const injectDark = (element) => {
+      if (!originalBackgrounds.has(element)) {
+        originalBackgrounds.set(element, {
+          value: element.style.getPropertyValue("background-color"),
+          priority: element.style.getPropertyPriority("background-color")
+        });
+      }
+      element.style.setProperty("background-color", settings.darkBackgroundColor, "important");
+      const original = originalBackgrounds.get(element);
+      original.injectedValue = element.style.getPropertyValue("background-color");
+      original.injectedPriority = element.style.getPropertyPriority("background-color");
+    };
+
+    // Hidden tabs get no animation frames, so they work on a timer instead
+    // (a larger budget is fine there: nothing is being painted).
+    let frameIsTimer = false;
+    const schedule = () => {
+      if (stopped || frame !== null) {
+        return;
+      }
+      frameIsTimer = document.visibilityState === "hidden";
+      frame = frameIsTimer
+        ? setTimeout(() => processBatch(4 * FRAME_BUDGET_MS), 0)
+        : requestAnimationFrame(() => processBatch(FRAME_BUDGET_MS));
+    };
+    const cancelScheduled = () => {
+      if (frame !== null) {
+        (frameIsTimer ? clearTimeout : cancelAnimationFrame)(frame);
+        frame = null;
+      }
+    };
+
+    const enqueueSubtree = (root) => {
+      pendingRoots.push(root);
+      schedule();
+    };
+
+    // Elements whose own class/style changed come first and are re-measured
+    // even if already darkened; then the queued subtrees are walked.
+    const nextCandidate = () => {
+      if (forcedElements.size > 0) {
+        const element = forcedElements.values().next().value;
+        forcedElements.delete(element);
+        return { element, forced: true };
+      }
+      while (activeWalker || pendingRoots.length > 0) {
+        if (!activeWalker) {
+          const root = pendingRoots.shift();
+          if (!root.isConnected) {
+            continue;
+          }
+          activeWalker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+          if (root !== document.documentElement) {
+            return { element: root, forced: false };
+          }
+        }
+        const next = activeWalker.nextNode();
+        if (next) {
+          return { element: next, forced: false };
+        }
+        activeWalker = null;
+      }
+      return null;
+    };
+
+    function processPageCanvas() {
+      // The page canvas (root background) is judged from rendered samples,
+      // since its visible color often comes from body or a full-page wrapper.
+      const root = document.documentElement;
+      const original = originalBackgrounds.get(root);
+      if (original) {
+        restoreOriginalBackground(root, original);
+      }
+      if (isBrightColor(detectPageBackgroundRgba())) {
+        injectDark(root);
+      } else if (original) {
+        originalBackgrounds.delete(root);
+      }
+    }
+
+    function processBatch(budgetMs) {
+      frame = null;
+      if (stopped) {
+        return;
+      }
+      const deadline = performance.now() + budgetMs;
+      const written = new Set();
+
+      if (canvasDirty) {
+        canvasDirty = false;
+        processPageCanvas();
+        written.add(document.documentElement);
+      }
+
+      // Collect a batch. Elements already darkened by us are skipped unless
+      // their own class/style changed (then they're re-measured).
+      const toMeasure = [];
+      const toRemeasure = [];
+      let next;
+      while (performance.now() < deadline && (next = nextCandidate())) {
+        const { element, forced } = next;
+        if (
+          !(element instanceof Element) ||
+          element.id === OVERLAY_ID ||
+          element === document.documentElement
+        ) {
+          continue;
+        }
+        const original = originalBackgrounds.get(element);
+        if (!original) {
+          toMeasure.push(element);
+        } else if (!isInjectedBackground(element, original)) {
+          // The page replaced our inline value: that's the new original.
+          originalBackgrounds.set(element, {
+            value: element.style.getPropertyValue("background-color"),
+            priority: element.style.getPropertyPriority("background-color")
+          });
+          toMeasure.push(element);
+        } else if (forced) {
+          toRemeasure.push(element);
+        }
+      }
+
+      // Re-measured elements need their original color back first (writes),
+      // then everything is read in one pass, then written in one pass.
+      for (const element of toRemeasure) {
+        restoreOriginalBackground(element, originalBackgrounds.get(element));
+        written.add(element);
+      }
+      const verdicts = [...toMeasure, ...toRemeasure].map((element) => [
+        element,
+        isBrightColor(parseCssColor(getComputedStyle(element).backgroundColor))
+      ]);
+      for (const [element, bright] of verdicts) {
+        if (bright) {
+          injectDark(element);
+          written.add(element);
+        } else {
+          originalBackgrounds.delete(element);
+        }
+      }
+
+      // Drop the observer records caused by our own writes; keep the page's.
+      handleMutations(
+        observer
+          .takeRecords()
+          .filter(
+            (record) =>
+              !(record.type === "attributes" &&
+                record.attributeName === "style" &&
+                written.has(record.target))
+          )
+      );
+
+      if (forcedElements.size > 0 || pendingRoots.length > 0 || activeWalker || canvasDirty) {
+        schedule();
+      }
+    }
+
+    function scheduleFullScan() {
+      canvasDirty = true;
+      enqueueSubtree(document.documentElement);
+    }
+
+    function handleMutations(mutations) {
+      let fullScan = false;
+      for (const mutation of mutations) {
+        if (mutation.type === "attributes") {
+          const target = mutation.target;
+          if (!(target instanceof Element) || target.id === OVERLAY_ID) {
+            continue;
+          }
+          if (target === document.documentElement || target === document.body) {
+            // Theme switches usually toggle a class here.
+            fullScan = true;
+            continue;
+          }
+          forcedElements.add(target);
+          if (mutation.attributeName === "class") {
+            // Descendant selectors may change with the class.
+            pendingRoots.push(target);
+          }
+          continue;
+        }
+
+        if (mutation.target instanceof Element && mutation.target.closest("style")) {
+          fullScan = true;
+        }
+        for (const node of mutation.addedNodes) {
+          if (!(node instanceof Element) || node.id === OVERLAY_ID) {
+            continue;
+          }
+          if (node.matches("style, link[rel~='stylesheet']")) {
+            fullScan = true;
+            if (node instanceof HTMLLinkElement) {
+              node.addEventListener("load", scheduleFullScan, { once: true });
+            }
+          }
+          pendingRoots.push(node);
+        }
+      }
+      if (fullScan) {
+        scheduleFullScan();
+      } else if (mutations.length > 0) {
+        schedule();
+      }
+    }
+
+    const observer = new MutationObserver(handleMutations);
     observer.observe(document.documentElement, {
       subtree: true,
       childList: true,
       attributes: true,
       attributeFilter: ["class", "style"]
     });
+    // First pass now rather than next frame, so the page's first paint is
+    // already darkened as far as a generous budget allows.
+    canvasDirty = true;
+    pendingRoots.push(document.documentElement);
+    processBatch(50);
 
-    window.addEventListener("resize", () => scheduleBrightnessReport(settings), {
-      passive: true
-    });
+    // A tab that was hidden may have switched from timers to frames.
+    const onVisibilityChange = () => {
+      if (frame !== null && frameIsTimer !== (document.visibilityState === "hidden")) {
+        cancelScheduled();
+        schedule();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("resize", scheduleFullScan, { passive: true });
+    prefersDarkQuery.addEventListener("change", scheduleFullScan);
 
-    const colorSchemeQuery = matchMedia("(prefers-color-scheme: dark)");
-    const onColorSchemeChanged = () => scheduleBrightnessReport(settings);
-    if (typeof colorSchemeQuery.addEventListener === "function") {
-      colorSchemeQuery.addEventListener("change", onColorSchemeChanged);
-    } else if (typeof colorSchemeQuery.addListener === "function") {
-      colorSchemeQuery.addListener(onColorSchemeChanged);
-    }
+    return {
+      stop() {
+        stopped = true;
+        cancelScheduled();
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+        observer.disconnect();
+        window.removeEventListener("resize", scheduleFullScan);
+        prefersDarkQuery.removeEventListener("change", scheduleFullScan);
+        originalBackgrounds.forEach((original, element) => {
+          if (element.isConnected) {
+            restoreOriginalBackground(element, original);
+          }
+        });
+        originalBackgrounds.clear();
+        forcedElements.clear();
+        pendingRoots.length = 0;
+        activeWalker = null;
+      }
+    };
   }
 
-  function transitionOnPageLoad(settings, incomingBrightness) {
-    const nextBrightness = reportCurrentBrightness(settings, true);
+  // ---- Transitions ----
+
+  function transitionOnPageLoad(settings, incomingBrightness, guardColor) {
+    const { brightness: nextBrightness } = measurePage(settings);
+    const shouldFade = shouldFadeTransition(incomingBrightness, nextBrightness);
 
     if (document.visibilityState === "hidden") {
-      if (
-        settings.tabSwitchTransitionEnabled &&
-        shouldFadeTransition(incomingBrightness, nextBrightness)
-      ) {
-        showGuardOverlay(settings.preloadColor);
+      if (settings.tabSwitchTransitionEnabled && shouldFade) {
+        showGuardOverlay(guardColor);
       } else {
         removeTransitionOverlay();
       }
-      return;
-    }
-
-    if (!shouldFadeTransition(incomingBrightness, nextBrightness)) {
+    } else if (shouldFade) {
+      playOverlayTransition(guardColor, settings.transitionDurationMs, settings.initialHoldMs);
+    } else {
       removeTransitionOverlay();
-      return;
     }
-
-    playOverlayTransition(
-      settings.preloadColor,
-      settings.transitionDurationMs,
-      settings.initialHoldMs
-    );
+    sendBrightnessReport(true);
   }
 
   function setupTabStateMessages(settings) {
@@ -932,7 +770,7 @@
         return false;
       }
 
-      if (message.type === MESSAGE_SET_TAB_GUARD) {
+      if (message.type === MESSAGES.SET_TAB_GUARD) {
         // Guard messages are for background tabs only -- activation has its
         // own message, so this can't cancel an in-progress fade.
         if (document.visibilityState !== "hidden") {
@@ -945,30 +783,28 @@
           settings.tabSwitchTransitionEnabled &&
           nextBrightness === BRIGHTNESS_BRIGHT
         ) {
-          showGuardOverlay(settings.preloadColor);
+          showGuardOverlay(chooseGuardColor(settings, message.activeColor));
         } else {
           removeTransitionOverlay();
         }
         return false;
       }
 
-      if (message.type === MESSAGE_TAB_ACTIVATED) {
-        const nextBrightness = reportCurrentBrightness(settings, true);
+      if (message.type === MESSAGES.TAB_ACTIVATED) {
+        const { brightness: nextBrightness } = measurePage(settings);
         if (
           settings.tabSwitchTransitionEnabled &&
-          shouldFadeTransition(
-            normalizeBrightness(message.previousBrightness),
-            nextBrightness
-          )
+          shouldFadeTransition(normalizeBrightness(message.previousBrightness), nextBrightness)
         ) {
           playOverlayTransition(
-            settings.preloadColor,
+            chooseGuardColor(settings, message.previousColor),
             settings.tabSwitchTransitionDurationMs,
             settings.tabSwitchInitialHoldMs
           );
         } else {
           removeTransitionOverlay();
         }
+        sendBrightnessReport(true);
       }
 
       return false;
@@ -983,10 +819,7 @@
   // opaque, resolve it from fresh local brightness detection instead.
   function setupVisibilityBackstop(settings) {
     document.addEventListener("visibilitychange", () => {
-      if (
-        document.visibilityState !== "visible" ||
-        !isEnabledOnCurrentPage(settings)
-      ) {
+      if (document.visibilityState !== "visible" || !isEnabledOnCurrentPage(settings)) {
         return;
       }
 
@@ -997,10 +830,7 @@
         }
 
         const nextBrightness = reportCurrentBrightness(settings, true);
-        if (
-          settings.tabSwitchTransitionEnabled &&
-          nextBrightness === BRIGHTNESS_BRIGHT
-        ) {
+        if (settings.tabSwitchTransitionEnabled && nextBrightness === BRIGHTNESS_BRIGHT) {
           playOverlayTransition(
             settings.preloadColor,
             settings.tabSwitchTransitionDurationMs,
@@ -1013,68 +843,60 @@
     });
   }
 
-  // Show the guard now, before the async storage/messaging below (which can
-  // take long enough for the page's own paint to win the race and flash
-  // first). Repainted or removed once real settings load.
-  showGuardOverlay(DEFAULT_SETTINGS.preloadColor);
-
-  // Listeners register synchronously too: an unheard message is dropped, not
-  // queued, so registering after the awaits could miss a tab-activation or
-  // guard message and leave the overlay stuck. settings is mutated in place
-  // (not reassigned) once real values load, so these still see them.
-  const settings = parseAndValidateSettings(DEFAULT_SETTINGS);
+  // ---- Startup ----
+  // The guard itself was painted by early-guard.js (where active). Listeners
+  // register synchronously: an unheard message is dropped, not queued, so
+  // registering after the awaits could miss a tab-activation or guard
+  // message and leave the overlay stuck. settings is mutated in place (not
+  // reassigned) once real values load, so these still see them.
+  const settings = compileSettings({});
   setupTabStateMessages(settings);
   setupVisibilityBackstop(settings);
+  setupNavigationHint(settings);
 
   api.runtime.onMessage.addListener((message) => {
-    if (message && message.type === MESSAGE_SET_PAGE_BRIGHTNESS) {
+    if (message && message.type === MESSAGES.SET_PAGE_BRIGHTNESS) {
       applyPageBrightness(message.value);
     }
     return false;
   });
 
-  const stored = await storageGet(null);
-  const rawSettings = { ...DEFAULT_SETTINGS, ...stored };
-  if (stored.siteListHosts === undefined && stored.excludedHosts) {
-    rawSettings.siteListHosts = stored.excludedHosts;
-  }
+  let rawSettings = await api.storage.sync.get(null);
+  Object.assign(settings, compileSettings(rawSettings));
 
-  Object.assign(settings, parseAndValidateSettings(rawSettings));
+  // Once a fade finishes, report again so pixel-accurate detection can take
+  // its screenshot without the overlay in it.
+  onOverlaySettled = () => {
+    if (settings.accurateDetection) {
+      reportCurrentBrightness(settings, true);
+    }
+  };
 
   // Independent of the guard settings above -- applies even if the guard is
   // disabled or this site is excluded.
-  const storedPageBrightness = await storageGetLocal({
+  const storedPageBrightness = await api.storage.local.get({
     [PAGE_BRIGHTNESS_STORAGE_KEY]: {}
   });
   applyPageBrightness(
-    (storedPageBrightness[PAGE_BRIGHTNESS_STORAGE_KEY] || {})[
-      window.location.hostname
-    ]
+    (storedPageBrightness[PAGE_BRIGHTNESS_STORAGE_KEY] || {})[window.location.hostname]
   );
 
-  if (api.storage && api.storage.onChanged) {
-    api.storage.onChanged.addListener((changes, areaName) => {
-      if (
-        areaName === "local" &&
-        Object.prototype.hasOwnProperty.call(changes, PAGE_BRIGHTNESS_STORAGE_KEY)
-      ) {
-        const updatedMap = changes[PAGE_BRIGHTNESS_STORAGE_KEY].newValue || {};
-        applyPageBrightness(updatedMap[window.location.hostname]);
-      }
-    });
-  }
-
-  const stateContext =
-    (await sendRuntimeMessage({ type: MESSAGE_DOCUMENT_INIT })) || {};
+  const stateContext = (await sendRuntimeMessage({ type: MESSAGES.DOCUMENT_INIT })) || {};
   const incomingBrightness =
     normalizeBrightness(stateContext.previousBrightness) ||
+    normalizeBrightness(navigationHint && navigationHint.brightness) ||
     normalizeBrightness(stateContext.ambientBrightness);
+  const guardColor = chooseGuardColor(
+    settings,
+    stateContext.previousColor ||
+      (navigationHint && navigationHint.guardColor) ||
+      stateContext.ambientColor
+  );
   let backgroundOverrideController = null;
 
   const syncBackgroundOverrides = () => {
     const shouldOverride =
-      isEnabledOnCurrentPage(settings) &&
-      settings.darkenBrightBackgroundsEnabled;
+      isEnabledOnCurrentPage(settings) && settings.darkenBrightBackgroundsEnabled;
 
     if (shouldOverride && !backgroundOverrideController) {
       backgroundOverrideController = setupBrightBackgroundOverrides(settings);
@@ -1084,79 +906,77 @@
     }
   };
 
-  if (api.storage && api.storage.onChanged) {
-    api.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName !== "sync") {
-        return;
+  api.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === "local") {
+      if (Object.prototype.hasOwnProperty.call(changes, PAGE_BRIGHTNESS_STORAGE_KEY)) {
+        const updatedMap = changes[PAGE_BRIGHTNESS_STORAGE_KEY].newValue || {};
+        applyPageBrightness(updatedMap[window.location.hostname]);
       }
+      return;
+    }
+    if (areaName !== "sync") {
+      return;
+    }
 
-      Object.entries(changes).forEach(([key, change]) => {
-        if (change.newValue === undefined) {
-          delete rawSettings[key];
-        } else {
-          rawSettings[key] = change.newValue;
-        }
-      });
+    rawSettings = { ...rawSettings };
+    Object.entries(changes).forEach(([key, change]) => {
+      if (change.newValue === undefined) {
+        delete rawSettings[key];
+      } else {
+        rawSettings[key] = change.newValue;
+      }
+    });
+    Object.assign(settings, compileSettings(rawSettings));
 
-      Object.assign(
-        settings,
-        parseAndValidateSettings({ ...DEFAULT_SETTINGS, ...rawSettings })
-      );
+    const changed = (keys) =>
+      keys.some((key) => Object.prototype.hasOwnProperty.call(changes, key));
 
-      const backgroundSettingsChanged = [
+    if (
+      backgroundOverrideController &&
+      changed([
         "applyOnAllPages",
         "siteListMode",
         "siteListHosts",
         "excludedHosts",
+        "scheduleMode",
+        "scheduleStart",
+        "scheduleEnd",
         "darkenBrightBackgroundsEnabled",
         "darkBackgroundColor",
         "backgroundBrightnessThreshold"
-      ].some((key) => Object.prototype.hasOwnProperty.call(changes, key));
-      const tabTransitionSettingsChanged = [
-        "tabSwitchTransitionEnabled",
-        "tabSwitchTransitionDurationMs",
-        "tabSwitchInitialHoldMs",
-        "preloadColor"
-      ].some((key) => Object.prototype.hasOwnProperty.call(changes, key));
+      ])
+    ) {
+      backgroundOverrideController.stop();
+      backgroundOverrideController = null;
+    }
 
-      if (backgroundSettingsChanged && backgroundOverrideController) {
-        backgroundOverrideController.stop();
-        backgroundOverrideController = null;
-      }
+    if (
+      !isEnabledOnCurrentPage(settings) ||
+      (changed(["tabSwitchTransitionEnabled"]) && !settings.tabSwitchTransitionEnabled)
+    ) {
+      removeTransitionOverlay();
+    }
+    syncBackgroundOverrides();
+    reportCurrentBrightness(
+      settings,
+      changed(["tabSwitchTransitionEnabled", "brightnessThreshold", "preloadColor"])
+    );
+  });
 
-      if (!isEnabledOnCurrentPage(settings)) {
-        removeTransitionOverlay();
-      } else if (
-        Object.prototype.hasOwnProperty.call(
-          changes,
-          "tabSwitchTransitionEnabled"
-        ) &&
-        !settings.tabSwitchTransitionEnabled
-      ) {
-        removeTransitionOverlay();
-      }
-      syncBackgroundOverrides();
-      if (tabTransitionSettingsChanged) {
-        reportCurrentBrightness(settings, true);
-      } else {
-        scheduleBrightnessReport(settings);
-      }
-    });
-  }
+  const whenDomReady = (callback) => {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", callback, { once: true });
+    } else {
+      callback();
+    }
+  };
 
   if (!isEnabledOnCurrentPage(settings)) {
     removeTransitionOverlay();
-    const reportDisabledPage = () => {
+    whenDomReady(() => {
       reportCurrentBrightness(settings, true);
       setupBrightnessMonitoring(settings);
-    };
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", reportDisabledPage, {
-        once: true
-      });
-    } else {
-      reportDisabledPage();
-    }
+    });
     return;
   }
 
@@ -1165,19 +985,13 @@
   if (incomingBrightness === BRIGHTNESS_BRIGHT) {
     removeTransitionOverlay();
   } else {
-    showGuardOverlay(settings.preloadColor);
+    // Repaint the early guard in the chosen color, or paint it now if the
+    // early guard didn't run (e.g. its registration hasn't happened yet).
+    showGuardOverlay(guardColor);
   }
 
-  const finishInitialPageDetection = () => {
-    transitionOnPageLoad(settings, incomingBrightness);
+  whenDomReady(() => {
+    transitionOnPageLoad(settings, incomingBrightness, guardColor);
     setupBrightnessMonitoring(settings);
-  };
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", finishInitialPageDetection, {
-      once: true
-    });
-  } else {
-    finishInitialPageDetection();
-  }
+  });
 })();

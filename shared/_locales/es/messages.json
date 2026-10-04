@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Dark Background Anti-Flash"
+  },
+  "extDescription": {
+    "message": "Reduce los destellos en páginas claras con una capa oscura temporal que se desvanece suavemente."
+  },
+  "menuOpenOptions": {
+    "message": "Abrir opciones"
+  },
+  "cmdToggleGuard": {
+    "message": "Activar o desactivar la protección"
+  },
+  "cmdToggleSite": {
+    "message": "Pausar o reanudar en el sitio actual"
+  },
+  "cmdBrightnessUp": {
+    "message": "Aclarar el sitio actual"
+  },
+  "cmdBrightnessDown": {
+    "message": "Oscurecer el sitio actual"
+  }
+}

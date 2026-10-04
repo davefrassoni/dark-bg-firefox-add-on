@@ -1,11 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Dark Background Anti-Flash",
-  "description": "Reduces bright flashes on bright pages using a temporary dark overlay that fades out smoothly.",
-  "version": "1.3.1",
+  "name": "__MSG_extName__",
+  "description": "__MSG_extDescription__",
+  "version": "1.4.0",
+  "default_locale": "en",
   "permissions": [
     "contextMenus",
-    "storage"
+    "storage",
+    "scripting",
+    "alarms"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -36,6 +39,8 @@
       ],
       "js": [
         "transition-policy.js",
+        "settings.js",
+        "color.js",
         "content/content-script.js"
       ],
       "run_at": "document_start",
@@ -45,5 +50,31 @@
   "options_ui": {
     "page": "options/options.html",
     "open_in_tab": true
+  },
+  "commands": {
+    "toggle-guard": {
+      "suggested_key": {
+        "default": "Alt+Shift+D"
+      },
+      "description": "__MSG_cmdToggleGuard__"
+    },
+    "toggle-site": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "__MSG_cmdToggleSite__"
+    },
+    "brightness-up": {
+      "suggested_key": {
+        "default": "Alt+Shift+Up"
+      },
+      "description": "__MSG_cmdBrightnessUp__"
+    },
+    "brightness-down": {
+      "suggested_key": {
+        "default": "Alt+Shift+Down"
+      },
+      "description": "__MSG_cmdBrightnessDown__"
+    }
   }
 }

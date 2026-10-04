@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Dark Background Anti-Flash"
+  },
+  "extDescription": {
+    "message": "在亮色页面上使用会平滑淡出的临时深色遮罩，减少刺眼的闪白。"
+  },
+  "menuOpenOptions": {
+    "message": "打开选项"
+  },
+  "cmdToggleGuard": {
+    "message": "开启或关闭淡出保护"
+  },
+  "cmdToggleSite": {
+    "message": "在当前网站暂停或恢复"
+  },
+  "cmdBrightnessUp": {
+    "message": "调亮当前网站"
+  },
+  "cmdBrightnessDown": {
+    "message": "调暗当前网站"
+  }
+}

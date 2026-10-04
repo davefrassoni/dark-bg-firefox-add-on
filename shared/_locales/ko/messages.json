@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Dark Background Anti-Flash"
+  },
+  "extDescription": {
+    "message": "밝은 페이지에서 부드럽게 사라지는 임시 어두운 오버레이로 눈부신 깜빡임을 줄여 줍니다."
+  },
+  "menuOpenOptions": {
+    "message": "옵션 열기"
+  },
+  "cmdToggleGuard": {
+    "message": "페이드 보호 켜기/끄기"
+  },
+  "cmdToggleSite": {
+    "message": "현재 사이트에서 일시 중지/다시 시작"
+  },
+  "cmdBrightnessUp": {
+    "message": "현재 사이트 밝게"
+  },
+  "cmdBrightnessDown": {
+    "message": "현재 사이트 어둡게"
+  }
+}

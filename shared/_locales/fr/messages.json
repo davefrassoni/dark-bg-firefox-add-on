@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Dark Background Anti-Flash"
+  },
+  "extDescription": {
+    "message": "Réduit les flashs lumineux sur les pages claires grâce à un voile sombre temporaire qui s’estompe en douceur."
+  },
+  "menuOpenOptions": {
+    "message": "Ouvrir les options"
+  },
+  "cmdToggleGuard": {
+    "message": "Activer ou désactiver la protection"
+  },
+  "cmdToggleSite": {
+    "message": "Mettre en pause ou reprendre sur le site actuel"
+  },
+  "cmdBrightnessUp": {
+    "message": "Éclaircir le site actuel"
+  },
+  "cmdBrightnessDown": {
+    "message": "Assombrir le site actuel"
+  }
+}

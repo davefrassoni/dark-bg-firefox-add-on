@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Dark Background Anti-Flash"
+  },
+  "extDescription": {
+    "message": "明るいページで、なめらかにフェードアウトする一時的な暗いオーバーレイを使ってまぶしいフラッシュを抑えます。"
+  },
+  "menuOpenOptions": {
+    "message": "オプションを開く"
+  },
+  "cmdToggleGuard": {
+    "message": "フェード保護をオン/オフ"
+  },
+  "cmdToggleSite": {
+    "message": "現在のサイトで一時停止/再開"
+  },
+  "cmdBrightnessUp": {
+    "message": "現在のサイトを明るくする"
+  },
+  "cmdBrightnessDown": {
+    "message": "現在のサイトを暗くする"
+  }
+}

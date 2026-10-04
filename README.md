@@ -7,20 +7,45 @@ flashes while pages load or when returning to a bright tab.
 
 ## Features
 
-- Temporary dark overlay with configurable hold and fade durations.
+- Temporary dark overlay with configurable hold and fade durations, painted
+  before the page's first frame.
 - Optional protection when returning to an existing tab.
 - Transition-aware behavior: fades occur only when moving from a dark or
   unknown surface to a bright page, including across origins.
-- Bright-page detection and optional replacement of bright CSS backgrounds.
-- Per-site blacklist or whitelist.
+- The fade starts from the previous page's own color when it was dark.
+- Bright-page detection, an optional pixel-accurate mode that also catches
+  bright images, and optional replacement of bright CSS backgrounds.
+- Per-site blacklist or whitelist, with a one-click "Pause here" in the
+  toolbar popup.
+- Schedule: always, only during set hours, or only while the system is in
+  dark mode.
+- Keyboard shortcuts: toggle the guard (Alt+Shift+D), pause or resume on the
+  current site (Alt+Shift+S), brighten or dim the current site
+  (Alt+Shift+Up/Down).
+- Fade preview on the options page.
 - Settings stored with browser sync storage; no analytics or data collection.
-- Options UI in English, Spanish, Portuguese, French, German, Chinese,
-  Japanese, Korean, Russian, and Arabic.
+- Popup, options page and store description in English, Spanish, Portuguese,
+  French, German, Chinese, Japanese, Korean, Russian, and Arabic.
+
+## How it works
+
+- `content/early-guard.js` paints the guard at `document_start`. The
+  background script registers it dynamically (`scripting` API) only where the
+  guard is active: excluded sites, a disabled guard and hours outside the
+  schedule never get it, so they never see a dark flash.
+- For same-site navigation the content script leaves a short-lived hint in
+  the site's `sessionStorage` on `pagehide`, so a bright-to-bright navigation
+  skips the guard without waiting for the background script.
+- `content/content-script.js` then decides from the previous page's
+  brightness (tracked per tab by `background.js`) whether to fade or clear.
 
 ## Project structure
 
-- `shared/`: background logic, content script, options UI, and icons used by
-  both browsers.
+- `shared/`: background logic, content scripts, popup, options UI, icons and
+  `_locales`, used by both browsers.
+  - `settings.js`, `color.js`, `transition-policy.js`, `i18n.js`: shared,
+    side-effect-free modules loaded by every context and by the tests.
+- `tools/build-locales.js`: regenerates `shared/_locales` from `i18n.js`.
 - `firefox/manifest.json`: Firefox-specific manifest (`menus`,
   `background.scripts`, and Gecko metadata).
 - `chrome/manifest.json`: Chrome-specific manifest (`contextMenus` and an MV3
@@ -85,8 +110,12 @@ Firefox `about:` pages do not allow normal content-script injection.
 
 ## Tests
 
-Run the transition-policy tests with:
-
 ```powershell
-node --test tests/*.test.js
+node --test
 ```
+
+After editing translations in `shared/i18n.js`, run
+`node tools/build-locales.js`; a test fails if `_locales` is out of date.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the tests, builds both
+browsers and validates the Firefox build with `web-ext lint` on every push.

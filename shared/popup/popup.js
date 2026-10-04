@@ -1,21 +1,31 @@
 const api = typeof browser !== "undefined" ? browser : chrome;
+const {
+  MESSAGES,
+  PAGE_BRIGHTNESS_STORAGE_KEY,
+  PAGE_BRIGHTNESS,
+  clamp,
+  compileSettings,
+  isLocationListed,
+  isActiveOnLocation,
+  setLocationListed
+} = globalThis.DarkAntiFlashSettings;
+const { resolveLanguage, translateDocument } = globalThis.DarkAntiFlashI18n;
 const $ = (selector) => document.querySelector(selector);
-
-const MESSAGE_SET_PAGE_BRIGHTNESS = "dark-anti-flash:set-page-brightness";
-const PAGE_BRIGHTNESS_STORAGE_KEY = "darkAntiFlashPageBrightness";
-const BRIGHTNESS_MIN = 30;
-const BRIGHTNESS_MAX = 150;
-const BRIGHTNESS_DEFAULT = 100;
 
 const hostLabel = $("#host-label");
 const fadeToggle = $("#fade-toggle");
+const siteSection = $("#site-section");
+const siteState = $("#site-state");
+const siteToggle = $("#site-toggle");
 const slider = $("#brightness-slider");
 const sliderValue = $("#brightness-value");
 const resetButton = $("#brightness-reset");
 const statusNode = $("#status");
 
+let t = (key) => key;
+let settings = compileSettings({});
 let activeTabId = null;
-let activeHostname = null;
+let currentSite = null;
 let persistTimer = null;
 
 function status(text, isError = false) {
@@ -23,54 +33,55 @@ function status(text, isError = false) {
   statusNode.className = isError ? "error" : "";
 }
 
-function clamp(value, min, max, fallback) {
-  const num = Number(value);
-  return Number.isFinite(num) ? Math.min(max, Math.max(min, num)) : fallback;
-}
+function render() {
+  fadeToggle.dataset.state = settings.applyOnAllPages ? "on" : "off";
+  fadeToggle.textContent = settings.applyOnAllPages ? t("popupOn") : t("popupOff");
 
-function storageGet(area, defaults) {
-  try {
-    const result = api.storage[area].get(defaults);
-    if (result && typeof result.then === "function") {
-      return result;
-    }
-  } catch (error) {
-    // Fall back to callback style.
+  if (!currentSite) {
+    siteSection.hidden = true;
+    return;
   }
-  return new Promise((resolve) => {
-    api.storage[area].get(defaults, (value) => resolve(value));
-  });
-}
+  siteSection.hidden = false;
+  const listed = isLocationListed(settings.siteListRules, currentSite.hostname, currentSite.pathname);
+  const allowedBySiteList = settings.siteListMode === "whitelist" ? listed : !listed;
+  const active = isActiveOnLocation(
+    settings,
+    currentSite.hostname,
+    currentSite.pathname,
+    new Date(),
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
 
-function storageSet(area, value) {
-  try {
-    const result = api.storage[area].set(value);
-    if (result && typeof result.then === "function") {
-      return result;
-    }
-  } catch (error) {
-    // Fall back to callback style.
+  if (!settings.applyOnAllPages) {
+    siteState.textContent = t("popupSiteOffEverywhere");
+  } else if (!allowedBySiteList) {
+    siteState.textContent = t("popupSitePaused");
+  } else {
+    siteState.textContent = active ? t("popupSiteActive") : t("popupSiteScheduled");
   }
-  return new Promise((resolve) => {
-    api.storage[area].set(value, () => resolve());
-  });
-}
-
-function setFadeToggleState(enabled) {
-  fadeToggle.dataset.state = enabled ? "on" : "off";
-  fadeToggle.textContent = enabled ? "ON" : "OFF";
-}
-
-async function loadFadeState() {
-  const stored = await storageGet("sync", { applyOnAllPages: true });
-  setFadeToggleState(Boolean(stored.applyOnAllPages));
+  siteToggle.textContent = allowedBySiteList ? t("popupPauseSite") : t("popupResumeSite");
+  siteToggle.disabled = !settings.applyOnAllPages;
 }
 
 fadeToggle.addEventListener("click", async () => {
-  const nextEnabled = fadeToggle.dataset.state !== "on";
-  setFadeToggleState(nextEnabled);
-  await storageSet("sync", { applyOnAllPages: nextEnabled });
-  status(nextEnabled ? "Fade guard enabled." : "Fade guard disabled.");
+  const applyOnAllPages = !settings.applyOnAllPages;
+  await api.storage.sync.set({ applyOnAllPages });
+  status(applyOnAllPages ? t("popupGuardEnabled") : t("popupGuardDisabled"));
+});
+
+// Pausing in blacklist mode lists the site; in whitelist mode it unlists it.
+siteToggle.addEventListener("click", async () => {
+  const listed = isLocationListed(settings.siteListRules, currentSite.hostname, currentSite.pathname);
+  const allowedBySiteList = settings.siteListMode === "whitelist" ? listed : !listed;
+  await api.storage.sync.set({
+    siteListHosts: setLocationListed(
+      settings.siteListHosts,
+      currentSite.hostname,
+      currentSite.pathname,
+      !listed
+    )
+  });
+  status(allowedBySiteList ? t("popupSitePausedStatus") : t("popupSiteResumedStatus"));
 });
 
 function setSliderDisplay(value) {
@@ -83,27 +94,24 @@ async function sendBrightnessToTab(value) {
     return;
   }
   try {
-    await api.tabs.sendMessage(activeTabId, {
-      type: MESSAGE_SET_PAGE_BRIGHTNESS,
-      value
-    });
+    await api.tabs.sendMessage(activeTabId, { type: MESSAGES.SET_PAGE_BRIGHTNESS, value });
   } catch (error) {
     // No content script on this page (e.g. a browser settings page).
   }
 }
 
 async function persistBrightness(value) {
-  if (!activeHostname) {
+  if (!currentSite) {
     return;
   }
-  const stored = await storageGet("local", { [PAGE_BRIGHTNESS_STORAGE_KEY]: {} });
+  const stored = await api.storage.local.get({ [PAGE_BRIGHTNESS_STORAGE_KEY]: {} });
   const map = { ...(stored[PAGE_BRIGHTNESS_STORAGE_KEY] || {}) };
-  if (value === BRIGHTNESS_DEFAULT) {
-    delete map[activeHostname];
+  if (value === PAGE_BRIGHTNESS.default) {
+    delete map[currentSite.hostname];
   } else {
-    map[activeHostname] = value;
+    map[currentSite.hostname] = value;
   }
-  await storageSet("local", { [PAGE_BRIGHTNESS_STORAGE_KEY]: map });
+  await api.storage.local.set({ [PAGE_BRIGHTNESS_STORAGE_KEY]: map });
 }
 
 function schedulePersist(value) {
@@ -112,70 +120,73 @@ function schedulePersist(value) {
 }
 
 slider.addEventListener("input", () => {
-  const value = clamp(slider.value, BRIGHTNESS_MIN, BRIGHTNESS_MAX, BRIGHTNESS_DEFAULT);
+  const value = clamp(slider.value, PAGE_BRIGHTNESS.min, PAGE_BRIGHTNESS.max, PAGE_BRIGHTNESS.default);
   setSliderDisplay(value);
   sendBrightnessToTab(value);
   schedulePersist(value);
 });
 
 resetButton.addEventListener("click", () => {
-  setSliderDisplay(BRIGHTNESS_DEFAULT);
-  sendBrightnessToTab(BRIGHTNESS_DEFAULT);
-  schedulePersist(BRIGHTNESS_DEFAULT);
-  status("Brightness reset for this page.");
+  setSliderDisplay(PAGE_BRIGHTNESS.default);
+  sendBrightnessToTab(PAGE_BRIGHTNESS.default);
+  schedulePersist(PAGE_BRIGHTNESS.default);
+  status(t("popupBrightnessReset"));
 });
 
 $("#settings").addEventListener("click", () => {
   api.runtime.openOptionsPage();
 });
 
+api.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "sync") {
+    return;
+  }
+  void loadSettings().then(render);
+});
+
+async function loadSettings() {
+  settings = compileSettings(await api.storage.sync.get(null));
+}
+
 async function init() {
-  let tab;
+  await loadSettings();
+  t = translateDocument(
+    document,
+    resolveLanguage(settings.uiLanguage, navigator.languages || [navigator.language])
+  );
+
+  let tab = null;
   try {
     [tab] = await api.tabs.query({ active: true, currentWindow: true });
   } catch (error) {
     tab = null;
   }
 
-  await loadFadeState();
+  try {
+    const url = tab && tab.url ? new URL(tab.url) : null;
+    currentSite = url && url.hostname ? { hostname: url.hostname, pathname: url.pathname } : null;
+  } catch (error) {
+    currentSite = null;
+  }
 
-  if (!tab || !tab.url) {
-    hostLabel.textContent = "This page";
+  render();
+
+  if (!currentSite) {
+    hostLabel.textContent = t("popupThisPage");
     slider.disabled = true;
     resetButton.disabled = true;
-    status("Page brightness is unavailable here.");
+    status(t("popupUnavailable"));
     return;
   }
 
   activeTabId = tab.id;
+  hostLabel.textContent = currentSite.hostname;
 
-  try {
-    activeHostname = new URL(tab.url).hostname || null;
-  } catch (error) {
-    activeHostname = null;
-  }
-
-  if (!activeHostname) {
-    hostLabel.textContent = "This page";
-    slider.disabled = true;
-    resetButton.disabled = true;
-    status("Page brightness is unavailable here.");
-    return;
-  }
-
-  hostLabel.textContent = activeHostname;
-
-  const storedBrightness = await storageGet("local", {
-    [PAGE_BRIGHTNESS_STORAGE_KEY]: {}
-  });
-  const map = storedBrightness[PAGE_BRIGHTNESS_STORAGE_KEY] || {};
-  const value = clamp(
-    map[activeHostname],
-    BRIGHTNESS_MIN,
-    BRIGHTNESS_MAX,
-    BRIGHTNESS_DEFAULT
+  const stored = await api.storage.local.get({ [PAGE_BRIGHTNESS_STORAGE_KEY]: {} });
+  const map = stored[PAGE_BRIGHTNESS_STORAGE_KEY] || {};
+  setSliderDisplay(
+    clamp(map[currentSite.hostname], PAGE_BRIGHTNESS.min, PAGE_BRIGHTNESS.max, PAGE_BRIGHTNESS.default)
   );
-  setSliderDisplay(value);
 }
 
 init();

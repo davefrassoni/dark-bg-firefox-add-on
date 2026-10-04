@@ -25,10 +25,35 @@
     );
   }
 
+  // A background tab gets a guard pre-painted when switching to it would go
+  // from the window's current (dark or unknown) brightness to a bright page.
+  function shouldArmGuard(tabActive, tabBrightness, activeBrightness) {
+    return !tabActive && shouldFadeTransition(activeBrightness, tabBrightness);
+  }
+
+  // Only tabs whose guard state actually changes need a message.
+  // tabs: [{ id, active }], lastSent: { [tabId]: boolean | undefined }.
+  function planGuardMessages(tabs, tabBrightness, activeBrightness, lastSent) {
+    const messages = [];
+    for (const tab of tabs) {
+      const armed = shouldArmGuard(
+        tab.active,
+        normalizeBrightness(tabBrightness[tab.id]),
+        normalizeBrightness(activeBrightness)
+      );
+      if (lastSent[tab.id] !== armed) {
+        messages.push({ tabId: tab.id, armed });
+      }
+    }
+    return messages;
+  }
+
   return {
     BRIGHTNESS_BRIGHT,
     BRIGHTNESS_DARK,
     normalizeBrightness,
-    shouldFadeTransition
+    shouldFadeTransition,
+    shouldArmGuard,
+    planGuardMessages
   };
 });

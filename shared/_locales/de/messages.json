@@ -1,0 +1,23 @@
+{
+  "extName": {
+    "message": "Dark Background Anti-Flash"
+  },
+  "extDescription": {
+    "message": "Verringert grelle Blitze auf hellen Seiten mit einer vorübergehenden dunklen Ebene, die sanft ausblendet."
+  },
+  "menuOpenOptions": {
+    "message": "Optionen öffnen"
+  },
+  "cmdToggleGuard": {
+    "message": "Schutz ein- oder ausschalten"
+  },
+  "cmdToggleSite": {
+    "message": "Auf der aktuellen Website pausieren oder fortsetzen"
+  },
+  "cmdBrightnessUp": {
+    "message": "Aktuelle Website aufhellen"
+  },
+  "cmdBrightnessDown": {
+    "message": "Aktuelle Website abdunkeln"
+  }
+}
