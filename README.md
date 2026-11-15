@@ -117,5 +117,5 @@ node --test
 After editing translations in `shared/i18n.js`, run
 `node tools/build-locales.js`; a test fails if `_locales` is out of date.
 
-GitHub Actions (`.github/workflows/ci.yml`) runs the tests, builds both
-browsers and validates the Firefox build with `web-ext lint` on every push.
+There is no CI: before pushing, run the tests, build both browsers and
+validate the Firefox build with `web-ext lint` locally.
